@@ -6,11 +6,18 @@
 
 ## Challenge
 
-Extract daily chart entries from **30 dental centers** across Germany, Austria, and Switzerland, each with different database schema names, using **automatic schema discovery**.
+Extract daily chart entries from **30 dental centers** across Germany, Austria, and Switzerland, each with **randomly generated table and column names**, using **pattern-based schema discovery**.
 
 ```
-30 Centers → Schema Auto-Discovery → Unified Extraction → Single Output
+30 Centers → Random Schemas → Pattern-Based Discovery → Unified Extraction → Single Output
 ```
+
+### Schema Complexity
+
+Each dental center has a unique, randomly generated schema:
+- **Tables**: `KARTEI_MN`, `KARTEI_8Y`, `KARTEI_XQ4` (random 2-4 char suffix)
+- **Columns**: `PATNR_NAN6`, `PATNR_DZ`, `PATNR_R2Z5` (each column has its own suffix)
+- **No consistent pattern** across centers - pure introspection required
 
 ---
 
@@ -166,11 +173,12 @@ python -m src.cli benchmark
 
 ## Key Features
 
-- **Schema Auto-Discovery**: No manual mapping files - introspects INFORMATION_SCHEMA
+- **Pattern-Based Schema Discovery**: Each table/column has random suffix - discovered via regex matching on INFORMATION_SCHEMA
+- **Per-Center Mapping Files**: Generated mappings stored in `data/mappings/` for reference
 - **Parallel Extraction**: ThreadPoolExecutor for concurrent database access
 - **Schema Caching**: Discovered schemas cached for performance
 - **Unified Output**: All centers output to same canonical format
-- **Performance Target**: <5 seconds for 30 centers (actual: ~1.2 seconds)
+- **Performance Target**: <5 seconds for 30 centers (actual: ~1.1 seconds)
 
 ---
 

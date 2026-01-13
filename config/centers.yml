@@ -1,5 +1,5 @@
 # Dental Center Configuration
-# Each center has a unique suffix for table/column names
+# Schema suffixes are now RANDOM per table and column - discovered via introspection
 
 database:
   host: localhost
@@ -12,183 +12,153 @@ centers:
   # Germany - Major Cities
   - id: center_01
     name: Zahnarztpraxis München
-    suffix: M1
-    database: DentalDB_M1
+    database: DentalDB_01
     city: München
 
   - id: center_02
     name: Dental Klinik Berlin
-    suffix: B2
-    database: DentalDB_B2
+    database: DentalDB_02
     city: Berlin
 
   - id: center_03
     name: Praxis Dr. Schmidt
-    suffix: H3
-    database: DentalDB_H3
+    database: DentalDB_03
     city: Hamburg
 
   - id: center_04
     name: Zahnzentrum Frankfurt
-    suffix: F4
-    database: DentalDB_F4
+    database: DentalDB_04
     city: Frankfurt
 
   - id: center_05
     name: Dental Care Köln
-    suffix: K5
-    database: DentalDB_K5
+    database: DentalDB_05
     city: Köln
 
   - id: center_06
     name: Praxis Sonnenschein
-    suffix: D6
-    database: DentalDB_D6
+    database: DentalDB_06
     city: Dresden
 
   - id: center_07
     name: Zahnärzte am Markt
-    suffix: S7
-    database: DentalDB_S7
+    database: DentalDB_07
     city: Stuttgart
 
   - id: center_08
     name: Smile Center Leipzig
-    suffix: L8
-    database: DentalDB_L8
+    database: DentalDB_08
     city: Leipzig
 
   - id: center_09
     name: Dental Plus
-    suffix: U9
-    database: DentalDB_U9
+    database: DentalDB_09
     city: Düsseldorf
 
   - id: center_10
     name: Praxis Alpenblick
-    suffix: W0
-    database: DentalDB_W0
+    database: DentalDB_10
     city: Wien
 
   # Germany - Additional Cities
   - id: center_11
     name: Zahnarzt am Dom
-    suffix: A1
-    database: DentalDB_A1
+    database: DentalDB_11
     city: Aachen
 
   - id: center_12
     name: Praxis Dr. Weber
-    suffix: N2
-    database: DentalDB_N2
+    database: DentalDB_12
     city: Nürnberg
 
   - id: center_13
     name: Dental Lounge
-    suffix: E3
-    database: DentalDB_E3
+    database: DentalDB_13
     city: Essen
 
   - id: center_14
     name: Zahnklinik Riverside
-    suffix: R4
-    database: DentalDB_R4
+    database: DentalDB_14
     city: Regensburg
 
   - id: center_15
     name: Praxis Lächeln
-    suffix: P5
-    database: DentalDB_P5
+    database: DentalDB_15
     city: Potsdam
 
   - id: center_16
     name: Dental Wellness
-    suffix: G6
-    database: DentalDB_G6
+    database: DentalDB_16
     city: Göttingen
 
   - id: center_17
     name: Zahnärzte Altstadt
-    suffix: T7
-    database: DentalDB_T7
+    database: DentalDB_17
     city: Trier
 
   - id: center_18
     name: Smile Factory
-    suffix: C8
-    database: DentalDB_C8
+    database: DentalDB_18
     city: Chemnitz
 
   - id: center_19
     name: Praxis Dr. Müller
-    suffix: J9
-    database: DentalDB_J9
+    database: DentalDB_19
     city: Jena
 
   - id: center_20
     name: Dental Excellence
-    suffix: X0
-    database: DentalDB_X0
+    database: DentalDB_20
     city: Wiesbaden
 
   # Austria
   - id: center_21
     name: Zahnarzt Stephansplatz
-    suffix: V1
-    database: DentalDB_V1
+    database: DentalDB_21
     city: Wien
 
   - id: center_22
     name: Dental Studio Salzburg
-    suffix: Z2
-    database: DentalDB_Z2
+    database: DentalDB_22
     city: Salzburg
 
   - id: center_23
     name: Praxis Bergblick
-    suffix: I3
-    database: DentalDB_I3
+    database: DentalDB_23
     city: Innsbruck
 
   - id: center_24
     name: Zahnklinik Graz
-    suffix: Q4
-    database: DentalDB_Q4
+    database: DentalDB_24
     city: Graz
 
   - id: center_25
     name: Smile Center Linz
-    suffix: Y5
-    database: DentalDB_Y5
+    database: DentalDB_25
     city: Linz
 
   # Switzerland
   - id: center_26
     name: Zahnarztpraxis Zürich
-    suffix: ZH
-    database: DentalDB_ZH
+    database: DentalDB_26
     city: Zürich
 
   - id: center_27
     name: Dental Care Bern
-    suffix: BE
-    database: DentalDB_BE
+    database: DentalDB_27
     city: Bern
 
   - id: center_28
     name: Praxis Genève
-    suffix: GE
-    database: DentalDB_GE
+    database: DentalDB_28
     city: Genève
 
   - id: center_29
     name: Zahnzentrum Basel
-    suffix: BS
-    database: DentalDB_BS
+    database: DentalDB_29
     city: Basel
 
   - id: center_30
     name: Smile Clinic Lausanne
-    suffix: LA
-    database: DentalDB_LA
+    database: DentalDB_30
     city: Lausanne

@@ -2,11 +2,15 @@
 """
 Generate test databases for multi-center extraction.
 
-Creates 10 databases with different table/column suffixes,
-each populated with identical sample data.
+Creates 30 databases with RANDOM table/column suffixes per element,
+simulating real-world schema variations across dental centers.
+Each center gets a mapping file recording the actual schema.
 """
 
+import json
 import logging
+import random
+import string
 import sys
 from pathlib import Path
 
@@ -53,6 +57,97 @@ SAMPLE_SERVICES = [
     (3, 20220118, "Ä935"),
 ]
 
+# Canonical schema definition
+# This defines what tables and columns we expect in each center
+CANONICAL_SCHEMA = {
+    "PATIENT": {
+        "columns": ["ID", "P_NAME", "P_VORNAME", "DELKZ"],
+        "id_column": "ID",
+    },
+    "KASSEN": {
+        "columns": ["ID", "NAME", "ART", "DELKZ"],
+        "id_column": "ID",
+    },
+    "PATKASSE": {
+        "columns": ["ID", "PATNR", "KASSENID", "DELKZ"],
+        "id_column": "ID",
+        "identity": True,
+    },
+    "KARTEI": {
+        "columns": ["ID", "PATNR", "DATUM", "BEMERKUNG", "DELKZ"],
+        "id_column": "ID",
+        "identity": True,
+    },
+    "LEISTUNG": {
+        "columns": ["ID", "PATIENTID", "DATUM", "LEISTUNG", "DELKZ"],
+        "id_column": "ID",
+        "identity": True,
+    },
+}
+
+
+def generate_suffix() -> str:
+    """Generate a random 2-4 character suffix."""
+    length = random.choice([2, 3, 4])
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+def generate_schema_mapping(center_id: str) -> dict:
+    """
+    Generate random suffixes for each table and column.
+
+    Returns a mapping structure like:
+    {
+        "center_id": "center_01",
+        "tables": {
+            "PATIENT": {
+                "actual_name": "PATIENT_X7K",
+                "columns": {
+                    "ID": "ID",  # ID columns keep their name
+                    "P_NAME": "P_NAME_QW2",
+                    "P_VORNAME": "P_VORNAME_8M",
+                    "DELKZ": "DELKZ"  # DELKZ keeps its name (standard flag)
+                }
+            },
+            ...
+        }
+    }
+    """
+    mapping = {
+        "center_id": center_id,
+        "schema": "ck",
+        "tables": {},
+    }
+
+    for table_name, table_def in CANONICAL_SCHEMA.items():
+        table_suffix = generate_suffix()
+        actual_table_name = f"{table_name}_{table_suffix}"
+
+        column_mapping = {}
+        for col in table_def["columns"]:
+            # Keep ID and DELKZ columns unchanged (they're standard)
+            if col in ("ID", "DELKZ"):
+                column_mapping[col] = col
+            else:
+                col_suffix = generate_suffix()
+                column_mapping[col] = f"{col}_{col_suffix}"
+
+        mapping["tables"][table_name] = {
+            "actual_name": actual_table_name,
+            "columns": column_mapping,
+        }
+
+    return mapping
+
+
+def save_mapping(mapping: dict, output_dir: Path) -> None:
+    """Save mapping to JSON file."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filepath = output_dir / f"{mapping['center_id']}_schema.json"
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(mapping, f, indent=2, ensure_ascii=False)
+    logger.info(f"  Saved mapping to {filepath.name}")
+
 
 def load_centers():
     """Load center configuration."""
@@ -91,21 +186,23 @@ def get_db_connection(db_config, database):
 def create_database(conn, db_name):
     """Create a database if it doesn't exist."""
     cursor = conn.cursor()
-    
+
     # Check if exists
     cursor.execute(f"SELECT DB_ID('{db_name}')")
     if cursor.fetchone()[0] is not None:
         logger.info(f"  Database {db_name} already exists, dropping...")
-        cursor.execute(f"ALTER DATABASE [{db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
+        cursor.execute(
+            f"ALTER DATABASE [{db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE"
+        )
         cursor.execute(f"DROP DATABASE [{db_name}]")
-    
+
     logger.info(f"  Creating database {db_name}...")
     cursor.execute(f"CREATE DATABASE [{db_name}]")
     cursor.close()
 
 
-def create_schema_and_tables(db_config, database, suffix):
-    """Create schema and tables with suffixed names."""
+def create_schema_and_tables(db_config, database, mapping: dict):
+    """Create schema and tables with randomized names from mapping."""
     conn = get_db_connection(db_config, database)
     cursor = conn.cursor()
 
@@ -115,55 +212,62 @@ def create_schema_and_tables(db_config, database, suffix):
         EXEC('CREATE SCHEMA ck')
     """)
 
+    tables = mapping["tables"]
+
     # Create PATIENT table
+    t = tables["PATIENT"]
     cursor.execute(f"""
-        CREATE TABLE ck.PATIENT_{suffix} (
-            ID INT PRIMARY KEY,
-            P_NAME_{suffix} NVARCHAR(100),
-            P_VORNAME_{suffix} NVARCHAR(100),
-            DELKZ INT DEFAULT 0
+        CREATE TABLE ck.{t['actual_name']} (
+            {t['columns']['ID']} INT PRIMARY KEY,
+            {t['columns']['P_NAME']} NVARCHAR(100),
+            {t['columns']['P_VORNAME']} NVARCHAR(100),
+            {t['columns']['DELKZ']} INT DEFAULT 0
         )
     """)
 
     # Create KASSEN table
+    t = tables["KASSEN"]
     cursor.execute(f"""
-        CREATE TABLE ck.KASSEN_{suffix} (
-            ID INT PRIMARY KEY,
-            NAME_{suffix} NVARCHAR(100),
-            ART_{suffix} VARCHAR(10),
-            DELKZ INT DEFAULT 0
+        CREATE TABLE ck.{t['actual_name']} (
+            {t['columns']['ID']} INT PRIMARY KEY,
+            {t['columns']['NAME']} NVARCHAR(100),
+            {t['columns']['ART']} VARCHAR(10),
+            {t['columns']['DELKZ']} INT DEFAULT 0
         )
     """)
 
     # Create PATKASSE table
+    t = tables["PATKASSE"]
     cursor.execute(f"""
-        CREATE TABLE ck.PATKASSE_{suffix} (
-            ID INT IDENTITY PRIMARY KEY,
-            PATNR_{suffix} INT,
-            KASSENID_{suffix} INT,
-            DELKZ INT DEFAULT 0
+        CREATE TABLE ck.{t['actual_name']} (
+            {t['columns']['ID']} INT IDENTITY PRIMARY KEY,
+            {t['columns']['PATNR']} INT,
+            {t['columns']['KASSENID']} INT,
+            {t['columns']['DELKZ']} INT DEFAULT 0
         )
     """)
 
     # Create KARTEI table
+    t = tables["KARTEI"]
     cursor.execute(f"""
-        CREATE TABLE ck.KARTEI_{suffix} (
-            ID INT IDENTITY PRIMARY KEY,
-            PATNR_{suffix} INT,
-            DATUM_{suffix} INT,
-            BEMERKUNG_{suffix} NVARCHAR(500),
-            DELKZ INT DEFAULT 0
+        CREATE TABLE ck.{t['actual_name']} (
+            {t['columns']['ID']} INT IDENTITY PRIMARY KEY,
+            {t['columns']['PATNR']} INT,
+            {t['columns']['DATUM']} INT,
+            {t['columns']['BEMERKUNG']} NVARCHAR(500),
+            {t['columns']['DELKZ']} INT DEFAULT 0
         )
     """)
 
     # Create LEISTUNG table
+    t = tables["LEISTUNG"]
     cursor.execute(f"""
-        CREATE TABLE ck.LEISTUNG_{suffix} (
-            ID INT IDENTITY PRIMARY KEY,
-            PATIENTID_{suffix} INT,
-            DATUM_{suffix} INT,
-            LEISTUNG_{suffix} VARCHAR(20),
-            DELKZ INT DEFAULT 0
+        CREATE TABLE ck.{t['actual_name']} (
+            {t['columns']['ID']} INT IDENTITY PRIMARY KEY,
+            {t['columns']['PATIENTID']} INT,
+            {t['columns']['DATUM']} INT,
+            {t['columns']['LEISTUNG']} VARCHAR(20),
+            {t['columns']['DELKZ']} INT DEFAULT 0
         )
     """)
 
@@ -171,44 +275,61 @@ def create_schema_and_tables(db_config, database, suffix):
     conn.close()
 
 
-def populate_data(db_config, database, suffix):
-    """Populate tables with sample data."""
+def populate_data(db_config, database, mapping: dict):
+    """Populate tables with sample data using mapping."""
     conn = get_db_connection(db_config, database)
     cursor = conn.cursor()
 
+    tables = mapping["tables"]
+
     # Insert patients
+    t = tables["PATIENT"]
     for id, name, vorname in SAMPLE_PATIENTS:
         cursor.execute(
-            f"INSERT INTO ck.PATIENT_{suffix} (ID, P_NAME_{suffix}, P_VORNAME_{suffix}) VALUES (?, ?, ?)",
-            (id, name, vorname)
+            f"INSERT INTO ck.{t['actual_name']} "
+            f"({t['columns']['ID']}, {t['columns']['P_NAME']}, {t['columns']['P_VORNAME']}) "
+            f"VALUES (?, ?, ?)",
+            (id, name, vorname),
         )
 
     # Insert insurance providers
+    t = tables["KASSEN"]
     for id, name, art in SAMPLE_INSURANCE:
         cursor.execute(
-            f"INSERT INTO ck.KASSEN_{suffix} (ID, NAME_{suffix}, ART_{suffix}) VALUES (?, ?, ?)",
-            (id, name, art)
+            f"INSERT INTO ck.{t['actual_name']} "
+            f"({t['columns']['ID']}, {t['columns']['NAME']}, {t['columns']['ART']}) "
+            f"VALUES (?, ?, ?)",
+            (id, name, art),
         )
 
     # Link patients to insurance (patient ID = insurance ID for simplicity)
+    t = tables["PATKASSE"]
     for id, _, _ in SAMPLE_PATIENTS:
         cursor.execute(
-            f"INSERT INTO ck.PATKASSE_{suffix} (PATNR_{suffix}, KASSENID_{suffix}) VALUES (?, ?)",
-            (id, id)
+            f"INSERT INTO ck.{t['actual_name']} "
+            f"({t['columns']['PATNR']}, {t['columns']['KASSENID']}) "
+            f"VALUES (?, ?)",
+            (id, id),
         )
 
     # Insert chart entries
+    t = tables["KARTEI"]
     for patient_id, datum, entry in SAMPLE_CHART_ENTRIES:
         cursor.execute(
-            f"INSERT INTO ck.KARTEI_{suffix} (PATNR_{suffix}, DATUM_{suffix}, BEMERKUNG_{suffix}) VALUES (?, ?, ?)",
-            (patient_id, datum, entry)
+            f"INSERT INTO ck.{t['actual_name']} "
+            f"({t['columns']['PATNR']}, {t['columns']['DATUM']}, {t['columns']['BEMERKUNG']}) "
+            f"VALUES (?, ?, ?)",
+            (patient_id, datum, entry),
         )
 
     # Insert services
+    t = tables["LEISTUNG"]
     for patient_id, datum, code in SAMPLE_SERVICES:
         cursor.execute(
-            f"INSERT INTO ck.LEISTUNG_{suffix} (PATIENTID_{suffix}, DATUM_{suffix}, LEISTUNG_{suffix}) VALUES (?, ?, ?)",
-            (patient_id, datum, code)
+            f"INSERT INTO ck.{t['actual_name']} "
+            f"({t['columns']['PATIENTID']}, {t['columns']['DATUM']}, {t['columns']['LEISTUNG']}) "
+            f"VALUES (?, ?, ?)",
+            (patient_id, datum, code),
         )
 
     cursor.close()
@@ -218,12 +339,14 @@ def populate_data(db_config, database, suffix):
 def main():
     logger.info("=" * 60)
     logger.info("Multi-Center Test Database Generator")
+    logger.info("With RANDOM Schema Variations")
     logger.info("=" * 60)
 
     db_config, centers = load_centers()
-    
+    mappings_dir = Path(__file__).parent.parent / "data" / "mappings"
+
     logger.info(f"\nConnecting to SQL Server at {db_config['host']}:{db_config['port']}...")
-    
+
     try:
         master_conn = get_master_connection(db_config)
     except Exception as e:
@@ -236,33 +359,45 @@ def main():
 
     for center in centers:
         logger.info(f"Creating {center['name']} ({center['database']})...")
-        
+
         try:
+            # Generate random schema mapping for this center
+            mapping = generate_schema_mapping(center["id"])
+
             # Create database
             create_database(master_conn, center["database"])
-            
-            # Create schema and tables
-            create_schema_and_tables(db_config, center["database"], center["suffix"])
-            
+
+            # Create schema and tables with random names
+            create_schema_and_tables(db_config, center["database"], mapping)
+
             # Populate data
-            populate_data(db_config, center["database"], center["suffix"])
-            
-            logger.info(f"  ✓ Done\n")
+            populate_data(db_config, center["database"], mapping)
+
+            # Save mapping file
+            save_mapping(mapping, mappings_dir)
+
+            logger.info(f"  Done\n")
         except Exception as e:
-            logger.error(f"  ✗ Error: {e}\n")
+            logger.error(f"  Error: {e}\n")
             return 1
 
     master_conn.close()
 
     logger.info("=" * 60)
     logger.info(f"Created {len(centers)} test databases")
+    logger.info(f"Mappings saved to: {mappings_dir}")
     logger.info("=" * 60)
-    
+
     logger.info("\nSample data per database:")
     logger.info(f"  - {len(SAMPLE_PATIENTS)} patients")
     logger.info(f"  - {len(SAMPLE_INSURANCE)} insurance providers")
     logger.info(f"  - {len(SAMPLE_CHART_ENTRIES)} chart entries")
     logger.info(f"  - {len(SAMPLE_SERVICES)} service codes")
+
+    logger.info("\nSchema variations:")
+    logger.info("  - Each table has a RANDOM suffix (e.g., KARTEI_X7K)")
+    logger.info("  - Each column has a RANDOM suffix (e.g., PATNR_QW2)")
+    logger.info("  - Mappings stored in data/mappings/<center_id>_schema.json")
 
     logger.info("\nTest with:")
     logger.info("  python -m src.cli list")

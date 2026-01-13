@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CenterConfig:
     """Configuration for a single dental center."""
-    
+
     id: str
     name: str
-    suffix: str
     database: str
     city: str
 
@@ -27,7 +26,7 @@ class CenterConfig:
 @dataclass
 class DatabaseConfig:
     """Database connection configuration."""
-    
+
     host: str
     port: int
     user: str
@@ -46,10 +45,10 @@ class DatabaseConfig:
         )
 
 
-@dataclass 
+@dataclass
 class AppConfig:
     """Application configuration."""
-    
+
     database: DatabaseConfig
     centers: list[CenterConfig]
 
@@ -88,7 +87,6 @@ def load_config(config_path: Path | None = None) -> AppConfig:
         CenterConfig(
             id=c["id"],
             name=c["name"],
-            suffix=c["suffix"],
             database=c["database"],
             city=c["city"],
         )
