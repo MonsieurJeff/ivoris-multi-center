@@ -291,7 +291,7 @@ async def get_schema_diff(center_id: str):
         raise HTTPException(status_code=404, detail=f"Center not found: {center_id}")
 
     # Load ground truth
-    ground_truth_file = GROUND_TRUTH_DIR / f"{center_id}_schema.json"
+    ground_truth_file = GROUND_TRUTH_DIR / f"{center_id}_ground_truth.json"
     if not ground_truth_file.exists():
         raise HTTPException(
             status_code=404,
@@ -342,8 +342,10 @@ async def get_schema_diff(center_id: str):
         columns_diff = {}
         gt_columns = gt_data.get("columns", {})
 
-        for canonical_col, gt_col_actual in gt_columns.items():
+        for canonical_col, gt_col_value in gt_columns.items():
             columns_total += 1
+            # Ground truth columns are stored as direct string values
+            gt_col_actual = gt_col_value if isinstance(gt_col_value, str) else gt_col_value.get("actual_name", "")
             mapping_col_actual = mapping_columns.get(canonical_col, "")
 
             col_match = gt_col_actual == mapping_col_actual
