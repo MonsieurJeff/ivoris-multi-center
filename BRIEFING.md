@@ -15,6 +15,40 @@
 
 ---
 
+## Database Architecture
+
+### Why Two Docker Containers?
+
+| Container | Port | Project | Databases | Purpose |
+|-----------|------|---------|-----------|---------|
+| `ivoris-sqlserver` | 1433 | ivoris-pipeline | 1 (`DentalDB`) | Main challenge - single center |
+| `ivoris-multi-sqlserver` | 1434 | ivoris-multi-center | 30 (`DentalDB_01`-`DentalDB_30`) | Extension - multi-center |
+
+### Why 30 Databases in Multi-Center?
+
+The extension challenge demonstrates **scale and schema chaos**:
+
+1. **30 dental centers** across Germany (20), Austria (5), and Switzerland (5)
+2. **Each center = separate database** (simulates real-world isolation)
+3. **Each database has RANDOM schema names** (the hard problem)
+4. **Same logical tables, different physical names**:
+
+```
+DentalDB_01: KARTEI_MN,  PATNR_NAN6, DATUM_3A4
+DentalDB_02: KARTEI_8Y,  PATNR_DZ,   DATUM_QW2
+DentalDB_03: KARTEI_XQ4, PATNR_R2Z5, DATUM_7M
+...
+DentalDB_30: KARTEI_LA,  PATNR_BE,   DATUM_ZH
+```
+
+### Why This Matters
+
+> "In production, Clinero manages many dental practices. Each Ivoris installation can have different schema names due to software versioning, migrations, or local customizations. You can't write one SQL query that works everywhere."
+
+This is the **real-world problem** the multi-center solution solves.
+
+---
+
 ## Database Installation (From Scratch)
 
 ### Project 1: ivoris-pipeline

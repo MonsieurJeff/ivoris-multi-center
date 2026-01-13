@@ -15,6 +15,34 @@
 
 ---
 
+## Database Architecture
+
+### Docker Containers
+
+| Container | Port | Project | Databases |
+|-----------|------|---------|-----------|
+| `ivoris-sqlserver` | 1433 | ivoris-pipeline | 1 (`DentalDB`) |
+| `ivoris-multi-sqlserver` | 1434 | ivoris-multi-center | 30 (`DentalDB_01`-`DentalDB_30`) |
+
+### Why 30 Databases?
+
+The multi-center extension demonstrates **real-world scale**:
+
+- **30 dental centers** across Germany (20), Austria (5), Switzerland (5)
+- **Each center = separate database** (production isolation)
+- **Each database has RANDOM schema names** (the hard problem)
+- **Same logical tables, different physical names**
+
+```
+DentalDB_01: KARTEI_MN   → columns: PATNR_NAN6, DATUM_3A4
+DentalDB_02: KARTEI_8Y   → columns: PATNR_DZ,   DATUM_QW2
+DentalDB_30: KARTEI_LA   → columns: PATNR_BE,   DATUM_ZH
+```
+
+> "You can't write one SQL query that works everywhere. Each center needs its own mapping."
+
+---
+
 ## ivoris-pipeline Commands
 
 **Location:** `~/Projects/outre_base/sandbox/ivoris-pipeline`
