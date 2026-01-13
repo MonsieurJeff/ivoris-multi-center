@@ -180,9 +180,13 @@
     async function loadCenters() {
         try {
             const response = await fetch('/api/centers');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             const data = await response.json();
 
-            centerSelect.innerHTML = '<option value="">Select a center...</option>';
+            centerSelect.innerHTML = '';
+            let firstMappedCenter = null;
             data.centers.forEach(center => {
                 const status = center.has_mapping ? '' : ' (no mapping)';
                 const option = document.createElement('option');
@@ -190,7 +194,18 @@
                 option.textContent = `${center.name} - ${center.city}${status}`;
                 option.disabled = !center.has_mapping;
                 centerSelect.appendChild(option);
+
+                // Track first center with mapping
+                if (!firstMappedCenter && center.has_mapping) {
+                    firstMappedCenter = center.id;
+                }
             });
+
+            // Auto-select first center with mapping
+            if (firstMappedCenter) {
+                centerSelect.value = firstMappedCenter;
+                loadCenterDetails(firstMappedCenter);
+            }
         } catch (err) {
             console.error('Failed to load centers:', err);
             centerSelect.innerHTML = '<option value="">Error loading centers</option>';
@@ -231,15 +246,24 @@
                 currentMapping = data.mapping;
 
                 // Populate table dropdown
-                tableSelect.innerHTML = '<option value="">Select a table...</option>';
-                for (const tableName of Object.keys(data.mapping.tables || {})) {
+                tableSelect.innerHTML = '';
+                const tableNames = Object.keys(data.mapping.tables || {});
+
+                // Prefer KARTEI as default, otherwise first table
+                let defaultTable = tableNames.includes('KARTEI') ? 'KARTEI' : tableNames[0];
+
+                for (const tableName of tableNames) {
                     const option = document.createElement('option');
                     option.value = tableName;
                     option.textContent = tableName;
                     tableSelect.appendChild(option);
                 }
 
-                mappingView.classList.add('hidden');
+                // Auto-select default table and show mapping
+                if (defaultTable) {
+                    tableSelect.value = defaultTable;
+                    showMappingDetails(defaultTable);
+                }
                 dataView.classList.add('hidden');
             } else {
                 mappingEl.textContent = 'Not Available';
@@ -309,7 +333,16 @@
             // Use cached data if available
             if (!dataCache) {
                 const response = await fetch(`/api/extract?date=2022-01-18&centers=${currentCenterId}`);
-                dataCache = await response.json();
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+                }
+                const text = await response.text();
+                try {
+                    dataCache = JSON.parse(text);
+                } catch (parseErr) {
+                    throw new Error(`Invalid JSON: ${text.substring(0, 100)}`);
+                }
             }
 
             dataLoading.classList.add('hidden');
