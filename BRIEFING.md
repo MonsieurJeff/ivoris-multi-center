@@ -4,6 +4,92 @@
 
 ---
 
+## Database Installation (From Scratch)
+
+If you need to explain or demo the full setup from zero:
+
+### Why SQL Server?
+
+- **Industry standard** for dental software in DACH region (Germany, Austria, Switzerland)
+- **Ivoris uses SQL Server** - this matches the real-world production environment
+- **Docker** makes it portable - runs identically on Mac, Linux, Windows
+
+### Infrastructure Setup
+
+```bash
+# 1. Start SQL Server 2019 in Docker
+docker-compose up -d
+
+# What this creates:
+#   - Container: ivoris-multi-sqlserver
+#   - Port: 1434 (mapped to internal 1433)
+#   - Credentials: sa / MultiCenter@2024
+#   - Volume: sqlserver_data (persistent)
+
+# 2. Wait for SQL Server to be ready (~30 seconds)
+sleep 30
+
+# 3. Verify it's running
+docker ps | grep ivoris
+```
+
+### Database Generation (The Magic)
+
+```bash
+# Generate 30 test databases with RANDOM schemas
+python scripts/generate_test_dbs.py
+```
+
+**What this does:**
+
+1. **Creates 30 databases**: `DentalDB_01` through `DentalDB_30`
+2. **Randomizes EVERY name**:
+   - Tables: `KARTEI_MN`, `KARTEI_8Y`, `KARTEI_XQ4` (random 2-4 char suffix)
+   - Columns: `PATNR_NAN6`, `DATUM_3A4`, `BEMERKUNG_QW2` (each column gets its own suffix)
+3. **Populates sample data**: 5 patients, 5 insurers, 8 chart entries per center
+4. **Saves ground truth**: `data/ground_truth/<center_id>_ground_truth.json`
+
+### Schema Randomization Example
+
+```
+Center 01:  KARTEI_MN   → PATNR_NAN6,  DATUM_3A4,  BEMERKUNG_QW2
+Center 02:  KARTEI_8Y   → PATNR_DZ,    DATUM_QW2,  BEMERKUNG_X7K
+Center 03:  KARTEI_XQ4  → PATNR_R2Z5,  DATUM_7M,   BEMERKUNG_P3
+...
+Center 30:  KARTEI_LA   → PATNR_BE,    DATUM_ZH,   BEMERKUNG_Y5
+```
+
+**No two centers have the same schema** - this is the challenge.
+
+### Complete From-Scratch Flow
+
+```bash
+# 1. Infrastructure
+docker-compose up -d && sleep 30
+
+# 2. Dependencies
+pip install -r requirements.txt
+
+# 3. Generate databases (with random schemas)
+python scripts/generate_test_dbs.py
+
+# 4. Discover schemas from databases
+python -m src.cli discover-raw
+
+# 5. Generate mapping proposals
+python -m src.cli generate-mappings
+
+# 6. Extract data
+python -m src.cli extract --date 2022-01-18
+
+# 7. Benchmark
+python -m src.cli benchmark
+```
+
+**Total time from zero to extraction: ~2 minutes**
+
+---
+
 ## Step 1: Prepare (30 min before)
 
 Read these in order:
