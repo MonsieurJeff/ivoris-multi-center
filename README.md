@@ -6,10 +6,10 @@
 
 ## Challenge
 
-Extract daily chart entries from **10 dental centers**, each with different database schema names, using **automatic schema discovery**.
+Extract daily chart entries from **30 dental centers** across Germany, Austria, and Switzerland, each with different database schema names, using **automatic schema discovery**.
 
 ```
-10 Centers → Schema Auto-Discovery → Unified Extraction → Single Output
+30 Centers → Schema Auto-Discovery → Unified Extraction → Single Output
 ```
 
 ---
@@ -75,6 +75,8 @@ python -m src.cli benchmark
 
 ## Centers
 
+### Germany (20 Centers)
+
 | ID | Name | City | Suffix |
 |----|------|------|--------|
 | center_01 | Zahnarztpraxis München | München | M1 |
@@ -87,6 +89,36 @@ python -m src.cli benchmark
 | center_08 | Smile Center Leipzig | Leipzig | L8 |
 | center_09 | Dental Plus | Düsseldorf | U9 |
 | center_10 | Praxis Alpenblick | Wien | W0 |
+| center_11 | Zahnarzt am Dom | Aachen | A1 |
+| center_12 | Praxis Dr. Weber | Nürnberg | N2 |
+| center_13 | Dental Lounge | Essen | E3 |
+| center_14 | Zahnklinik Riverside | Regensburg | R4 |
+| center_15 | Praxis Lächeln | Potsdam | P5 |
+| center_16 | Dental Wellness | Göttingen | G6 |
+| center_17 | Zahnärzte Altstadt | Trier | T7 |
+| center_18 | Smile Factory | Chemnitz | C8 |
+| center_19 | Praxis Dr. Müller | Jena | J9 |
+| center_20 | Dental Excellence | Wiesbaden | X0 |
+
+### Austria (5 Centers)
+
+| ID | Name | City | Suffix |
+|----|------|------|--------|
+| center_21 | Zahnarzt Stephansplatz | Wien | V1 |
+| center_22 | Dental Studio Salzburg | Salzburg | Z2 |
+| center_23 | Praxis Bergblick | Innsbruck | I3 |
+| center_24 | Zahnklinik Graz | Graz | Q4 |
+| center_25 | Smile Center Linz | Linz | Y5 |
+
+### Switzerland (5 Centers)
+
+| ID | Name | City | Suffix |
+|----|------|------|--------|
+| center_26 | Zahnarztpraxis Zürich | Zürich | ZH |
+| center_27 | Dental Care Bern | Bern | BE |
+| center_28 | Praxis Genève | Genève | GE |
+| center_29 | Zahnzentrum Basel | Basel | BS |
+| center_30 | Smile Clinic Lausanne | Lausanne | LA |
 
 ---
 
@@ -138,7 +170,7 @@ python -m src.cli benchmark
 - **Parallel Extraction**: ThreadPoolExecutor for concurrent database access
 - **Schema Caching**: Discovered schemas cached for performance
 - **Unified Output**: All centers output to same canonical format
-- **Performance Target**: <5 seconds for 10 centers
+- **Performance Target**: <5 seconds for 30 centers (actual: ~1.2 seconds)
 
 ---
 
