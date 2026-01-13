@@ -1,8 +1,8 @@
-# Development Cheat Sheet
+# Quick Reference
 
-**Quick Reference for Ivoris Multi-Center Pipeline**
+**Developer Reference for Ivoris Multi-Center Pipeline**
 
-> **Full Version:** See [docs/presentation/CHEAT_SHEET.md](docs/presentation/CHEAT_SHEET.md) for the complete reference with Python examples, SQL queries, and API documentation.
+> **Full Version:** See [docs/presentation/QUICK_REFERENCE.md](docs/presentation/QUICK_REFERENCE.md) for the complete reference with Python examples, SQL queries, and API documentation.
 
 ---
 

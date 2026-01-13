@@ -1,6 +1,6 @@
-# Development Cheat Sheet
+# Quick Reference
 
-**Complete Reference for Ivoris Multi-Center Pipeline**
+**Complete Developer Reference for Ivoris Multi-Center Pipeline**
 
 ---
 

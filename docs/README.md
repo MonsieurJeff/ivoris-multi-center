@@ -14,7 +14,7 @@ docs/
 ├── TESTING.md                   # Test strategy and examples
 └── presentation/                # Loom video & demo materials
     ├── SCRIPT.md                # Main presentation script (5-7 min)
-    ├── CHEAT_SHEET.md           # Quick reference for live demo
+    ├── QUICK_REFERENCE.md       # Quick reference for live demo
     ├── STORY.md                 # Narrative arc for storytelling
     ├── DEMO_CHECKLIST.md        # Pre-recording checklist
     └── QUICK_CARD.md            # One-page printable reference
@@ -42,7 +42,7 @@ docs/
 | Document | Purpose |
 |----------|---------|
 | [Presentation Script](presentation/SCRIPT.md) | Talking points for Loom video |
-| [Cheat Sheet](presentation/CHEAT_SHEET.md) | Commands & file reference |
+| [Quick Reference](presentation/QUICK_REFERENCE.md) | Commands & file reference |
 | [Story Guide](presentation/STORY.md) | Narrative structure |
 | [Demo Checklist](presentation/DEMO_CHECKLIST.md) | Pre-recording setup |
 
@@ -54,7 +54,7 @@ docs/
 | [CHALLENGE.md](../CHALLENGE.md) | Challenge requirements |
 | [ACCEPTANCE.md](../ACCEPTANCE.md) | Gherkin acceptance criteria |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
-| [CHEAT_SHEET.md](../CHEAT_SHEET.md) | Quick command reference |
+| [QUICK_REFERENCE.md](../QUICK_REFERENCE.md) | Quick command reference |
 | [PRESENTATION.md](../PRESENTATION.md) | Original presentation outline |
 
 ## Reading Order
@@ -71,7 +71,7 @@ docs/
 
 1. **[TECH_SPEC.md](TECH_SPEC.md)** - Requirements, database, Docker, scalability
 2. **[METHODOLOGY.md](METHODOLOGY.md)** - Patterns, decisions, lessons learned
-3. **[Cheat Sheet](presentation/CHEAT_SHEET.md)** - Code examples, architecture
+3. **[Quick Reference](presentation/QUICK_REFERENCE.md)** - Code examples, architecture
 
 ### For Production Deployment
 

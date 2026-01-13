@@ -212,16 +212,7 @@ async def extract_data(
                 "duration_ms": round(r.duration_ms, 1),
                 "success": r.error is None,
                 "error": r.error,
-                "entries": [
-                    {
-                        "center_id": e.center_id,
-                        "date": e.date.isoformat() if e.date else None,
-                        "patient_id": e.patient_id,
-                        "insurance_type": e.insurance_type,
-                        "entry": e.entry,
-                    }
-                    for e in r.entries
-                ],
+                "entries": [e.to_dict() for e in r.entries],
             }
         )
 

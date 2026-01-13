@@ -126,7 +126,7 @@
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Patient ID</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Date</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Insurance</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Entry</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Chart Entry</th>
                             </tr>
                         </thead>
                         <tbody id="data-table">
@@ -343,8 +343,8 @@
                 row.innerHTML = `
                     <td class="py-3 px-4 font-mono text-slate-900 dark:text-white">${entry.patient_id || '-'}</td>
                     <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.date || '-'}</td>
-                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.insurance_type || '-'}</td>
-                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.entry || '-'}</td>
+                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.insurance_name || entry.insurance_status || '-'}</td>
+                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.chart_entry || '-'}</td>
                 `;
                 tbody.appendChild(row);
             }
