@@ -5,7 +5,7 @@
     <!-- Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Explore Centers</h1>
-        <p class="text-slate-600 dark:text-slate-400 mt-2">Browse dental center schema mappings</p>
+        <p class="text-slate-600 dark:text-slate-400 mt-2">Browse dental center schema mappings and data</p>
     </div>
 
     <!-- Center Selection -->
@@ -41,16 +41,31 @@
             </div>
         </div>
 
-        <!-- Table Selection -->
+        <!-- Table Selection & View Toggle -->
         <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
-            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Table</label>
-            <select id="table-select" class="w-full max-w-md px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                <option value="">Select a table...</option>
-            </select>
+            <div class="flex flex-wrap items-end gap-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Table</label>
+                    <select id="table-select" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">Select a table...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">View</label>
+                    <div class="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600">
+                        <button id="view-mapping" class="px-4 py-2.5 text-sm font-medium bg-primary-600 text-white">
+                            Mapping
+                        </button>
+                        <button id="view-data" class="px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600">
+                            Data
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Table Mapping Details -->
-        <div id="table-details" class="hidden">
+        <!-- Mapping View -->
+        <div id="mapping-view" class="hidden">
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
@@ -69,6 +84,50 @@
                             </tr>
                         </thead>
                         <tbody id="columns-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data View -->
+        <div id="data-view" class="hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+                        Chart Entries
+                        <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2" id="data-date">(2022-01-18)</span>
+                    </h3>
+                    <span class="text-sm text-slate-500 dark:text-slate-400" id="data-count">0 entries</span>
+                </div>
+
+                <div id="data-loading" class="hidden py-8 text-center">
+                    <svg class="spinner w-8 h-8 text-primary-600 mx-auto" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-2 text-slate-500 dark:text-slate-400">Loading data...</p>
+                </div>
+
+                <div id="data-error" class="hidden py-8 text-center">
+                    <p class="text-red-600 dark:text-red-400" id="data-error-message">Failed to load data</p>
+                </div>
+
+                <div id="data-empty" class="hidden py-8 text-center">
+                    <p class="text-slate-500 dark:text-slate-400">No entries found for this date</p>
+                </div>
+
+                <div class="overflow-x-auto" id="data-table-container">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 dark:border-slate-700">
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Patient ID</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Date</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Insurance</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Entry</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table">
                         </tbody>
                     </table>
                 </div>
@@ -103,11 +162,17 @@
     const centerSelect = document.getElementById('center-select');
     const tableSelect = document.getElementById('table-select');
     const centerInfo = document.getElementById('center-info');
-    const tableDetails = document.getElementById('table-details');
+    const mappingView = document.getElementById('mapping-view');
+    const dataView = document.getElementById('data-view');
     const loading = document.getElementById('loading');
     const error = document.getElementById('error');
+    const viewMappingBtn = document.getElementById('view-mapping');
+    const viewDataBtn = document.getElementById('view-data');
 
     let currentMapping = null;
+    let currentCenterId = null;
+    let currentView = 'mapping';
+    let dataCache = null;
 
     // Load centers on page load
     async function loadCenters() {
@@ -134,10 +199,13 @@
     async function loadCenterDetails(centerId) {
         if (!centerId) {
             centerInfo.classList.add('hidden');
-            tableDetails.classList.add('hidden');
+            mappingView.classList.add('hidden');
+            dataView.classList.add('hidden');
             return;
         }
 
+        currentCenterId = centerId;
+        dataCache = null;
         loading.classList.remove('hidden');
         centerInfo.classList.add('hidden');
         error.classList.add('hidden');
@@ -169,7 +237,8 @@
                     tableSelect.appendChild(option);
                 }
 
-                tableDetails.classList.add('hidden');
+                mappingView.classList.add('hidden');
+                dataView.classList.add('hidden');
             } else {
                 mappingEl.textContent = 'Not Available';
                 mappingEl.className = 'font-medium text-red-600';
@@ -188,15 +257,15 @@
     }
 
     // Show table mapping details
-    function showTableDetails(tableName) {
+    function showMappingDetails(tableName) {
         if (!tableName || !currentMapping) {
-            tableDetails.classList.add('hidden');
+            mappingView.classList.add('hidden');
             return;
         }
 
         const tableData = currentMapping.tables[tableName];
         if (!tableData) {
-            tableDetails.classList.add('hidden');
+            mappingView.classList.add('hidden');
             return;
         }
 
@@ -216,12 +285,115 @@
             tbody.appendChild(row);
         }
 
-        tableDetails.classList.remove('hidden');
+        mappingView.classList.remove('hidden');
+    }
+
+    // Load and show data
+    async function loadData() {
+        if (!currentCenterId) return;
+
+        const dataLoading = document.getElementById('data-loading');
+        const dataError = document.getElementById('data-error');
+        const dataEmpty = document.getElementById('data-empty');
+        const dataTableContainer = document.getElementById('data-table-container');
+
+        // Show loading
+        dataLoading.classList.remove('hidden');
+        dataError.classList.add('hidden');
+        dataEmpty.classList.add('hidden');
+        dataTableContainer.classList.add('hidden');
+
+        try {
+            // Use cached data if available
+            if (!dataCache) {
+                const response = await fetch(`/api/extract?date=2022-01-18&centers=${currentCenterId}`);
+                dataCache = await response.json();
+            }
+
+            dataLoading.classList.add('hidden');
+
+            // Find entries for current center
+            const centerData = dataCache.centers?.find(c => c.center_id === currentCenterId);
+            const entries = centerData?.entries || [];
+
+            document.getElementById('data-count').textContent = `${entries.length} entries`;
+
+            if (entries.length === 0) {
+                dataEmpty.classList.remove('hidden');
+                return;
+            }
+
+            // Populate data table
+            const tbody = document.getElementById('data-table');
+            tbody.innerHTML = '';
+
+            for (const entry of entries) {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-100 dark:border-slate-700';
+                row.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-slate-900 dark:text-white">${entry.patient_id || '-'}</td>
+                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.date || '-'}</td>
+                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.insurance_type || '-'}</td>
+                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.entry || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            }
+
+            dataTableContainer.classList.remove('hidden');
+        } catch (err) {
+            console.error('Failed to load data:', err);
+            dataLoading.classList.add('hidden');
+            document.getElementById('data-error-message').textContent = err.message;
+            dataError.classList.remove('hidden');
+        }
+    }
+
+    // Switch view
+    function switchView(view) {
+        currentView = view;
+        const tableName = tableSelect.value;
+
+        // Update button styles
+        if (view === 'mapping') {
+            viewMappingBtn.className = 'px-4 py-2.5 text-sm font-medium bg-primary-600 text-white';
+            viewDataBtn.className = 'px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600';
+            dataView.classList.add('hidden');
+            if (tableName) {
+                showMappingDetails(tableName);
+            }
+        } else {
+            viewDataBtn.className = 'px-4 py-2.5 text-sm font-medium bg-primary-600 text-white';
+            viewMappingBtn.className = 'px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600';
+            mappingView.classList.add('hidden');
+            dataView.classList.remove('hidden');
+            loadData();
+        }
+    }
+
+    // Handle table selection
+    function onTableSelect() {
+        const tableName = tableSelect.value;
+        if (!tableName) {
+            mappingView.classList.add('hidden');
+            dataView.classList.add('hidden');
+            return;
+        }
+
+        if (currentView === 'mapping') {
+            showMappingDetails(tableName);
+            dataView.classList.add('hidden');
+        } else {
+            mappingView.classList.add('hidden');
+            dataView.classList.remove('hidden');
+            loadData();
+        }
     }
 
     // Event listeners
     centerSelect.addEventListener('change', () => loadCenterDetails(centerSelect.value));
-    tableSelect.addEventListener('change', () => showTableDetails(tableSelect.value));
+    tableSelect.addEventListener('change', onTableSelect);
+    viewMappingBtn.addEventListener('click', () => switchView('mapping'));
+    viewDataBtn.addEventListener('click', () => switchView('data'));
 
     // Initial load
     loadCenters();
