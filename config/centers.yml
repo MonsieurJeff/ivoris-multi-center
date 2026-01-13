@@ -1,0 +1,70 @@
+# Dental Center Configuration
+# Each center has a unique suffix for table/column names
+
+database:
+  host: localhost
+  port: 1434
+  user: sa
+  password: MultiCenter@2024
+  driver: ODBC Driver 18 for SQL Server
+
+centers:
+  - id: center_01
+    name: Zahnarztpraxis München
+    suffix: M1
+    database: DentalDB_M1
+    city: München
+
+  - id: center_02
+    name: Dental Klinik Berlin
+    suffix: B2
+    database: DentalDB_B2
+    city: Berlin
+
+  - id: center_03
+    name: Praxis Dr. Schmidt
+    suffix: H3
+    database: DentalDB_H3
+    city: Hamburg
+
+  - id: center_04
+    name: Zahnzentrum Frankfurt
+    suffix: F4
+    database: DentalDB_F4
+    city: Frankfurt
+
+  - id: center_05
+    name: Dental Care Köln
+    suffix: K5
+    database: DentalDB_K5
+    city: Köln
+
+  - id: center_06
+    name: Praxis Sonnenschein
+    suffix: D6
+    database: DentalDB_D6
+    city: Dresden
+
+  - id: center_07
+    name: Zahnärzte am Markt
+    suffix: S7
+    database: DentalDB_S7
+    city: Stuttgart
+
+  - id: center_08
+    name: Smile Center Leipzig
+    suffix: L8
+    database: DentalDB_L8
+    city: Leipzig
+
+  - id: center_09
+    name: Dental Plus
+    suffix: U9
+    database: DentalDB_U9
+    city: Düsseldorf
+
+  - id: center_10
+    name: Praxis Alpenblick
+    suffix: W0
+    database: DentalDB_W0
+    city: Wien

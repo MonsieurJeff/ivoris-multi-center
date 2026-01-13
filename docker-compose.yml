@@ -1,0 +1,25 @@
+# Multi-Center Ivoris Pipeline
+# Single SQL Server with 10 dental center databases
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    platform: linux/amd64
+    container_name: ivoris-multi-sqlserver
+    user: root
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=MultiCenter@2024
+      - MSSQL_PID=Developer
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql/data
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "MultiCenter@2024" -Q "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sqlserver_data:
