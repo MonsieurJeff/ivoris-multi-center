@@ -391,29 +391,35 @@
         }
     }
 
-    // Switch view
+    // Switch view - always updates content on each call
     function switchView(view) {
         currentView = view;
         const tableName = tableSelect.value;
 
-        // Update button styles
+        // Update button styles immediately
+        const activeClass = 'px-4 py-2.5 text-sm font-medium bg-primary-600 text-white';
+        const inactiveClass = 'px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600';
+
         if (view === 'mapping') {
-            viewMappingBtn.className = 'px-4 py-2.5 text-sm font-medium bg-primary-600 text-white';
-            viewDataBtn.className = 'px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600';
+            viewMappingBtn.className = activeClass;
+            viewDataBtn.className = inactiveClass;
             dataView.classList.add('hidden');
-            if (tableName) {
+            mappingView.classList.remove('hidden');
+            // Always refresh mapping when switching to mapping view
+            if (tableName && currentMapping) {
                 showMappingDetails(tableName);
             }
         } else {
-            viewDataBtn.className = 'px-4 py-2.5 text-sm font-medium bg-primary-600 text-white';
-            viewMappingBtn.className = 'px-4 py-2.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600';
+            viewDataBtn.className = activeClass;
+            viewMappingBtn.className = inactiveClass;
             mappingView.classList.add('hidden');
             dataView.classList.remove('hidden');
+            // Always refresh data when switching to data view
             loadData();
         }
     }
 
-    // Handle table selection
+    // Handle table selection - always updates the current view
     function onTableSelect() {
         const tableName = tableSelect.value;
         if (!tableName) {
@@ -422,21 +428,42 @@
             return;
         }
 
-        if (currentView === 'mapping') {
-            showMappingDetails(tableName);
-            dataView.classList.add('hidden');
-        } else {
-            mappingView.classList.add('hidden');
-            dataView.classList.remove('hidden');
-            loadData();
-        }
+        // Re-apply the current view to refresh content
+        switchView(currentView);
     }
 
-    // Event listeners
-    centerSelect.addEventListener('change', () => loadCenterDetails(centerSelect.value));
-    tableSelect.addEventListener('change', onTableSelect);
-    viewMappingBtn.addEventListener('click', () => switchView('mapping'));
-    viewDataBtn.addEventListener('click', () => switchView('data'));
+    // Event listeners - use both change and click for reliable triggering
+    centerSelect.addEventListener('change', () => {
+        loadCenterDetails(centerSelect.value);
+    });
+
+    // Force reload on click even if same value selected
+    centerSelect.addEventListener('click', (e) => {
+        if (e.target.tagName === 'OPTION' && centerSelect.value) {
+            loadCenterDetails(centerSelect.value);
+        }
+    });
+
+    tableSelect.addEventListener('change', () => {
+        onTableSelect();
+    });
+
+    // Force update on click even if same value selected
+    tableSelect.addEventListener('click', (e) => {
+        if (e.target.tagName === 'OPTION' && tableSelect.value) {
+            onTableSelect();
+        }
+    });
+
+    viewMappingBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView('mapping');
+    });
+
+    viewDataBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView('data');
+    });
 
     // Initial load
     loadCenters();
