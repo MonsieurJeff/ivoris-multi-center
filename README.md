@@ -33,19 +33,22 @@ sleep 30
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Generate test databases
+# 4. Generate test databases (with random schemas)
 python scripts/generate_test_dbs.py
 
-# 5. List centers
-python -m src.cli list
+# 5. Discover raw schema from database
+python -m src.cli discover-raw -c center_01
 
-# 6. Discover schemas
-python -m src.cli discover
+# 6. Generate mapping files (proposed, for manual review)
+python -m src.cli generate-mappings
 
-# 7. Extract data
+# 7. Review a mapping file
+python -m src.cli show-mapping center_01
+
+# 8. Extract data using mappings
 python -m src.cli extract --date 2022-01-18
 
-# 8. Run benchmark
+# 9. Run benchmark
 python -m src.cli benchmark
 ```
 
@@ -54,13 +57,21 @@ python -m src.cli benchmark
 ## Commands
 
 ```bash
-# List configured centers
+# List configured centers (shows mapping status)
 python -m src.cli list
 
-# Discover schemas (auto-introspection)
-python -m src.cli discover
+# Discover RAW schema from database (no interpretation)
+python -m src.cli discover-raw
+python -m src.cli discover-raw -c center_01
 
-# Extract from all centers
+# Generate mapping files from discovered schemas
+python -m src.cli generate-mappings
+
+# Show/review a mapping file
+python -m src.cli show-mapping           # List available
+python -m src.cli show-mapping center_01 # Show specific
+
+# Extract from all centers (requires mapping files)
 python -m src.cli extract --date 2022-01-18
 
 # Extract from specific center
@@ -173,12 +184,13 @@ python -m src.cli benchmark
 
 ## Key Features
 
-- **Pattern-Based Schema Discovery**: Each table/column has random suffix - discovered via regex matching on INFORMATION_SCHEMA
-- **Per-Center Mapping Files**: Generated mappings stored in `data/mappings/` for reference
+- **Raw Schema Discovery**: Query database INFORMATION_SCHEMA without interpretation
+- **Manual Mapping Workflow**: Generate proposed mappings, review manually, then extract
+- **Per-Center Mapping Files**: JSON files in `data/mappings/` with "reviewed" flag
+- **Ground Truth Separation**: Generator saves actual schema to `data/ground_truth/`
 - **Parallel Extraction**: ThreadPoolExecutor for concurrent database access
-- **Schema Caching**: Discovered schemas cached for performance
 - **Unified Output**: All centers output to same canonical format
-- **Performance Target**: <5 seconds for 30 centers (actual: ~1.1 seconds)
+- **Performance Target**: <5 seconds for 30 centers (actual: ~380ms with pre-loaded mappings)
 
 ---
 

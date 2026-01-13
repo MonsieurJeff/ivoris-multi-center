@@ -140,13 +140,13 @@ def generate_schema_mapping(center_id: str) -> dict:
     return mapping
 
 
-def save_mapping(mapping: dict, output_dir: Path) -> None:
-    """Save mapping to JSON file."""
+def save_ground_truth(mapping: dict, output_dir: Path) -> None:
+    """Save ground truth mapping (what was actually generated)."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    filepath = output_dir / f"{mapping['center_id']}_schema.json"
+    filepath = output_dir / f"{mapping['center_id']}_ground_truth.json"
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(mapping, f, indent=2, ensure_ascii=False)
-    logger.info(f"  Saved mapping to {filepath.name}")
+    logger.info(f"  Saved ground truth to {filepath.name}")
 
 
 def load_centers():
@@ -343,7 +343,7 @@ def main():
     logger.info("=" * 60)
 
     db_config, centers = load_centers()
-    mappings_dir = Path(__file__).parent.parent / "data" / "mappings"
+    ground_truth_dir = Path(__file__).parent.parent / "data" / "ground_truth"
 
     logger.info(f"\nConnecting to SQL Server at {db_config['host']}:{db_config['port']}...")
 
@@ -373,8 +373,8 @@ def main():
             # Populate data
             populate_data(db_config, center["database"], mapping)
 
-            # Save mapping file
-            save_mapping(mapping, mappings_dir)
+            # Save ground truth (what was actually generated)
+            save_ground_truth(mapping, ground_truth_dir)
 
             logger.info(f"  Done\n")
         except Exception as e:
@@ -385,7 +385,7 @@ def main():
 
     logger.info("=" * 60)
     logger.info(f"Created {len(centers)} test databases")
-    logger.info(f"Mappings saved to: {mappings_dir}")
+    logger.info(f"Ground truth saved to: {ground_truth_dir}")
     logger.info("=" * 60)
 
     logger.info("\nSample data per database:")
@@ -397,12 +397,12 @@ def main():
     logger.info("\nSchema variations:")
     logger.info("  - Each table has a RANDOM suffix (e.g., KARTEI_X7K)")
     logger.info("  - Each column has a RANDOM suffix (e.g., PATNR_QW2)")
-    logger.info("  - Mappings stored in data/mappings/<center_id>_schema.json")
+    logger.info("  - Ground truth in data/ground_truth/<center_id>_ground_truth.json")
 
-    logger.info("\nTest with:")
-    logger.info("  python -m src.cli list")
-    logger.info("  python -m src.cli discover")
-    logger.info("  python -m src.cli extract --date 2022-01-18")
+    logger.info("\nNext steps:")
+    logger.info("  1. python -m src.cli discover-raw   # See raw schema")
+    logger.info("  2. python -m src.cli map-schema     # Agentic mapping")
+    logger.info("  3. python -m src.cli extract        # Extract data")
 
     return 0
 

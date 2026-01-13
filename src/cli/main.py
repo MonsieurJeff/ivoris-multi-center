@@ -1,5 +1,12 @@
 """
 CLI for Ivoris Multi-Center Extraction Pipeline.
+
+Workflow:
+1. generate_test_dbs.py    - Create databases with random schemas
+2. discover-raw            - View raw schema from database
+3. generate-mappings       - Create mapping files (for manual review)
+4. extract                 - Extract data using mappings
+5. benchmark               - Performance test
 """
 
 import argparse
@@ -9,42 +16,122 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from ..core.config import load_config
-from ..core.introspector import clear_cache, get_schema
+from ..core.introspector import clear_cache, list_available_mappings
 from ..services.extraction import ExtractionService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+# Directories
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
+MAPPINGS_DIR = DATA_DIR / "mappings"
+GROUND_TRUTH_DIR = DATA_DIR / "ground_truth"
 
-def cmd_discover(args, config):
-    """Discover and display schemas for all centers."""
-    logger.info("Discovering schemas for all centers...")
 
-    # Clear cache to force fresh discovery
-    clear_cache()
+def cmd_discover_raw(args, config):
+    """Discover and display RAW schemas from databases."""
+    from ..core.discovery import SchemaDiscovery
 
-    for center in config.centers:
+    centers = config.centers
+    if args.center:
+        centers = [c for c in centers if c.id == args.center]
+        if not centers:
+            logger.error(f"Unknown center: {args.center}")
+            return 1
+
+    for center in centers:
         conn_str = config.database.connection_string(center.database)
 
         try:
-            schema = get_schema(center.id, conn_str)
+            discovery = SchemaDiscovery(conn_str)
+            discovered = discovery.discover()
+
             print(f"\n{'='*60}")
             print(f"Center: {center.name} ({center.id})")
-            print(f"Database: {center.database}")
-            print(f"Schema Type: Random suffixes per table/column")
+            print(f"Database: {discovered.database}")
             print(f"{'='*60}")
 
-            for table_name, table in schema.tables.items():
-                print(f"\n  {table_name} -> {table.actual_name}")
-                for canonical, col_mapping in table.columns.items():
-                    if canonical != col_mapping.actual_name:
-                        print(f"    {canonical} -> {col_mapping.actual_name}")
+            for table in discovered.tables:
+                print(f"\nTABLE: {table.schema}.{table.name}")
+                for col in table.columns:
+                    nullable = "NULL" if col.is_nullable else "NOT NULL"
+                    print(f"  - {col.name} ({col.data_type}, {nullable})")
+
         except Exception as e:
-            print(f"\n{center.name}: {e}")
+            print(f"\n{center.name}: Error - {e}")
+
+    return 0
+
+
+def cmd_generate_mappings(args, config):
+    """Generate mapping files from discovered schemas."""
+    from ..services.mapping_generator import generate_all_mappings
+
+    logger.info("Generating mapping files from discovered schemas...")
+    logger.info(f"Output directory: {MAPPINGS_DIR}")
+
+    generated = generate_all_mappings(config, MAPPINGS_DIR)
+
+    print(f"\n{'='*60}")
+    print(f"Generated {len(generated)} mapping files")
+    print(f"{'='*60}")
+    print(f"\nFiles saved to: {MAPPINGS_DIR}")
+    print("\nIMPORTANT: Review and adjust mappings as needed before extraction.")
+    print("Each file has 'reviewed: false' flag - set to true after review.")
+
+    return 0
+
+
+def cmd_show_mapping(args, config):
+    """Show a mapping file for a center."""
+    import json
+
+    if not args.center:
+        # List available mappings
+        available = list_available_mappings(MAPPINGS_DIR)
+        if available:
+            print("Available mappings:")
+            for m in sorted(available):
+                print(f"  - {m}")
+        else:
+            print("No mapping files found. Run 'generate-mappings' first.")
+        return 0
+
+    filepath = MAPPINGS_DIR / f"{args.center}_mapping.json"
+    if not filepath.exists():
+        logger.error(f"No mapping file for {args.center}")
+        return 1
+
+    with open(filepath) as f:
+        mapping = json.load(f)
+
+    print(f"\n{'='*60}")
+    print(f"Mapping: {args.center}")
+    print(f"Database: {mapping.get('database')}")
+    print(f"Reviewed: {mapping.get('reviewed', False)}")
+    print(f"{'='*60}")
+
+    for canonical, table in mapping.get("tables", {}).items():
+        print(f"\n{canonical} -> {table['actual_name']}")
+        for col_canonical, col_data in table.get("columns", {}).items():
+            print(f"  {col_canonical} -> {col_data['actual_name']}")
+
+    unmapped = mapping.get("unmapped_tables", [])
+    if unmapped:
+        print(f"\nUnmapped tables: {', '.join(unmapped)}")
+
+    return 0
 
 
 def cmd_extract(args, config):
     """Extract chart entries from centers."""
+    # Check for mapping files
+    available = list_available_mappings(MAPPINGS_DIR)
+    if not available:
+        logger.error("No mapping files found.")
+        logger.info("Run 'python -m src.cli generate-mappings' first.")
+        return 1
+
     # Parse date
     if args.date:
         try:
@@ -96,11 +183,16 @@ def cmd_extract(args, config):
 
 def cmd_benchmark(args, config):
     """Run performance benchmark."""
-    from datetime import date
+    # Check for mapping files
+    available = list_available_mappings(MAPPINGS_DIR)
+    if not available:
+        logger.error("No mapping files found.")
+        logger.info("Run 'python -m src.cli generate-mappings' first.")
+        return 1
 
     logger.info("Running benchmark...")
 
-    # Clear schema cache to measure full introspection time
+    # Clear cache to measure full load time
     clear_cache()
 
     service = ExtractionService(config)
@@ -145,15 +237,20 @@ def cmd_list(args, config):
     print(f"Configured Dental Centers")
     print(f"{'='*60}")
 
+    # Check which have mappings
+    available_mappings = set(list_available_mappings(MAPPINGS_DIR))
+
     for center in config.centers:
-        print(f"\n  {center.id}")
+        has_mapping = center.id in available_mappings
+        status = "[mapped]" if has_mapping else "[no mapping]"
+        print(f"\n  {center.id} {status}")
         print(f"    Name: {center.name}")
         print(f"    City: {center.city}")
         print(f"    Database: {center.database}")
 
     print(f"\n{'='*60}")
     print(f"Total: {len(config.centers)} centers")
-    print(f"Note: Schema suffixes are random - use 'discover' to view")
+    print(f"Mapped: {len(available_mappings)} centers")
     print(f"{'='*60}")
 
 
@@ -161,13 +258,38 @@ def main():
     parser = argparse.ArgumentParser(
         description="Ivoris Multi-Center Extraction Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Workflow:
+  1. scripts/generate_test_dbs.py  - Create test databases
+  2. discover-raw                  - View raw database schema
+  3. generate-mappings             - Create mapping files
+  4. show-mapping                  - Review a mapping file
+  5. extract                       - Extract data
+  6. benchmark                     - Performance test
+        """,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
-    # discover command
+    # discover-raw command
     discover_parser = subparsers.add_parser(
-        "discover", help="Discover schemas for all centers"
+        "discover-raw", help="Discover RAW schema from database"
+    )
+    discover_parser.add_argument(
+        "--center", "-c", help="Specific center ID (default: all)"
+    )
+
+    # generate-mappings command
+    gen_parser = subparsers.add_parser(
+        "generate-mappings", help="Generate mapping files from schemas"
+    )
+
+    # show-mapping command
+    show_parser = subparsers.add_parser(
+        "show-mapping", help="Show mapping file for a center"
+    )
+    show_parser.add_argument(
+        "center", nargs="?", help="Center ID (omit to list available)"
     )
 
     # extract command
@@ -221,7 +343,9 @@ def main():
 
     # Dispatch command
     commands = {
-        "discover": cmd_discover,
+        "discover-raw": cmd_discover_raw,
+        "generate-mappings": cmd_generate_mappings,
+        "show-mapping": cmd_show_mapping,
         "extract": cmd_extract,
         "benchmark": cmd_benchmark,
         "list": cmd_list,

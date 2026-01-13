@@ -1,219 +1,111 @@
 """
-Schema Introspector - Auto-discovers database schema via pattern matching.
+Schema Introspector - Loads schema mappings for extraction.
 
-This module handles the complex task of discovering table and column names
-when each element has a random suffix. It uses INFORMATION_SCHEMA to query
-the actual database structure and pattern matching to identify canonical elements.
+This module loads pre-computed schema mappings (created by the agentic
+mapping process) and provides them to the extraction service.
 
-Strategy:
-1. Query all tables in the 'ck' schema
-2. Match tables to canonical names (PATIENT, KARTEI, KASSEN, PATKASSE, LEISTUNG)
-3. For each matched table, query its columns
-4. Match columns to expected canonical column names
-5. Build a complete SchemaMapping that can be used for queries
+The mappings are created through:
+1. Raw discovery (discovery.py) - finds tables/columns
+2. Agentic mapping (agentic_mapper.py) - identifies canonical names
+3. Saved to data/mappings/<center_id>_mapping.json
 """
 
+import json
 import logging
-import re
-from functools import lru_cache
-
-import pyodbc
+from pathlib import Path
 
 from .schema_mapping import ColumnMapping, SchemaMapping, TableMapping
 
 logger = logging.getLogger(__name__)
 
-# Canonical table definitions with expected columns
-# Each table has a base name and expected column base names
-CANONICAL_TABLES = {
-    "PATIENT": {
-        "pattern": r"^PATIENT[_A-Z0-9]*$",
-        "columns": {
-            "ID": r"^ID$",
-            "P_NAME": r"^P_NAME[_A-Z0-9]*$",
-            "P_VORNAME": r"^P_VORNAME[_A-Z0-9]*$",
-            "DELKZ": r"^DELKZ$",
-        },
-    },
-    "KASSEN": {
-        "pattern": r"^KASSEN[_A-Z0-9]*$",
-        "columns": {
-            "ID": r"^ID$",
-            "NAME": r"^NAME[_A-Z0-9]*$",
-            "ART": r"^ART[_A-Z0-9]*$",
-            "DELKZ": r"^DELKZ$",
-        },
-    },
-    "PATKASSE": {
-        "pattern": r"^PATKASSE[_A-Z0-9]*$",
-        "columns": {
-            "ID": r"^ID$",
-            "PATNR": r"^PATNR[_A-Z0-9]*$",
-            "KASSENID": r"^KASSENID[_A-Z0-9]*$",
-            "DELKZ": r"^DELKZ$",
-        },
-    },
-    "KARTEI": {
-        "pattern": r"^KARTEI[_A-Z0-9]*$",
-        "columns": {
-            "ID": r"^ID$",
-            "PATNR": r"^PATNR[_A-Z0-9]*$",
-            "DATUM": r"^DATUM[_A-Z0-9]*$",
-            "BEMERKUNG": r"^BEMERKUNG[_A-Z0-9]*$",
-            "DELKZ": r"^DELKZ$",
-        },
-    },
-    "LEISTUNG": {
-        "pattern": r"^LEISTUNG[_A-Z0-9]*$",
-        "columns": {
-            "ID": r"^ID$",
-            "PATIENTID": r"^PATIENTID[_A-Z0-9]*$",
-            "DATUM": r"^DATUM[_A-Z0-9]*$",
-            "LEISTUNG": r"^LEISTUNG[_A-Z0-9]*$",
-            "DELKZ": r"^DELKZ$",
-        },
-    },
-}
+# Default mappings directory
+MAPPINGS_DIR = Path(__file__).parent.parent.parent / "data" / "mappings"
 
 
-class SchemaIntrospector:
-    """Discovers database schema through pattern matching on INFORMATION_SCHEMA."""
+def load_mapping_file(center_id: str, mappings_dir: Path | None = None) -> dict:
+    """Load a mapping file for a center."""
+    if mappings_dir is None:
+        mappings_dir = MAPPINGS_DIR
 
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
+    filepath = mappings_dir / f"{center_id}_mapping.json"
 
-    def _get_connection(self) -> pyodbc.Connection:
-        return pyodbc.connect(self.connection_string)
+    if not filepath.exists():
+        raise FileNotFoundError(
+            f"No mapping file for {center_id}. "
+            f"Run 'python -m src.cli map-schema' first."
+        )
 
-    def discover_tables(self) -> dict[str, str]:
-        """
-        Query all tables in 'ck' schema and match to canonical names.
+    with open(filepath, encoding="utf-8") as f:
+        return json.load(f)
 
-        Returns:
-            dict mapping canonical name -> actual table name
-            e.g., {"PATIENT": "PATIENT_X7K", "KARTEI": "KARTEI_QW2", ...}
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT TABLE_NAME
-            FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_SCHEMA = 'ck' AND TABLE_TYPE = 'BASE TABLE'
-        """)
+def mapping_to_schema(mapping_data: dict) -> SchemaMapping:
+    """Convert mapping file data to SchemaMapping object."""
+    tables = {}
 
-        actual_tables = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        conn.close()
+    for canonical_table, table_data in mapping_data.get("tables", {}).items():
+        columns = {}
 
-        # Match each actual table to a canonical name
-        table_mapping = {}
-        for canonical_name, table_def in CANONICAL_TABLES.items():
-            pattern = re.compile(table_def["pattern"])
-            for actual_name in actual_tables:
-                if pattern.match(actual_name):
-                    table_mapping[canonical_name] = actual_name
-                    break
-
-        return table_mapping
-
-    def discover_columns(self, actual_table_name: str, canonical_table: str) -> dict[str, str]:
-        """
-        Query all columns for a table and match to canonical column names.
-
-        Args:
-            actual_table_name: The actual table name in the database
-            canonical_table: The canonical table name (e.g., "KARTEI")
-
-        Returns:
-            dict mapping canonical column name -> actual column name
-            e.g., {"PATNR": "PATNR_QW2", "DATUM": "DATUM_8MK", ...}
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = ?
-        """, (actual_table_name,))
-
-        actual_columns = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        conn.close()
-
-        # Get expected columns for this canonical table
-        expected_columns = CANONICAL_TABLES[canonical_table]["columns"]
-
-        # Match each actual column to a canonical name
-        column_mapping = {}
-        for canonical_col, pattern_str in expected_columns.items():
-            pattern = re.compile(pattern_str)
-            for actual_col in actual_columns:
-                if pattern.match(actual_col):
-                    column_mapping[canonical_col] = actual_col
-                    break
-
-        return column_mapping
-
-    def introspect(self) -> SchemaMapping:
-        """
-        Full schema introspection - discovers all tables and their columns.
-
-        Returns:
-            SchemaMapping with complete table and column mappings
-        """
-        # Discover tables
-        table_name_mapping = self.discover_tables()
-        logger.info(f"Discovered {len(table_name_mapping)} tables")
-
-        # Build table mappings with columns
-        tables = {}
-        for canonical_table, actual_table in table_name_mapping.items():
-            column_mapping = self.discover_columns(actual_table, canonical_table)
-
-            # Convert to ColumnMapping objects
-            columns = {
-                canonical: ColumnMapping(canonical_name=canonical, actual_name=actual)
-                for canonical, actual in column_mapping.items()
-            }
-
-            tables[canonical_table] = TableMapping(
-                canonical_name=canonical_table,
-                actual_name=actual_table,
-                columns=columns,
+        for canonical_col, col_data in table_data.get("columns", {}).items():
+            columns[canonical_col] = ColumnMapping(
+                canonical_name=canonical_col,
+                actual_name=col_data["actual_name"],
             )
 
-        return SchemaMapping(
-            schema="ck",
-            suffix="RANDOM",  # No single suffix anymore
-            tables=tables,
+        tables[canonical_table] = TableMapping(
+            canonical_name=canonical_table,
+            actual_name=table_data["actual_name"],
+            columns=columns,
         )
+
+    return SchemaMapping(
+        schema=mapping_data.get("schema", "ck"),
+        suffix="AGENTIC",  # Indicates mapping came from agentic process
+        tables=tables,
+    )
 
 
 # Cache for schema mappings per center
 _schema_cache: dict[str, SchemaMapping] = {}
 
 
-def get_schema(center_id: str, connection_string: str) -> SchemaMapping:
+def get_schema(center_id: str, connection_string: str = None) -> SchemaMapping:
     """
-    Get schema mapping for a center, using cache if available.
+    Get schema mapping for a center.
+
+    Loads from pre-computed mapping file (created by agentic mapper).
+    Connection string is ignored - kept for API compatibility.
 
     Args:
         center_id: The center identifier
-        connection_string: Database connection string
+        connection_string: Ignored (kept for compatibility)
 
     Returns:
         SchemaMapping for the center
     """
     if center_id not in _schema_cache:
-        logger.info(f"Introspecting schema for {center_id}")
-        introspector = SchemaIntrospector(connection_string)
-        _schema_cache[center_id] = introspector.introspect()
+        logger.info(f"Loading mapping for {center_id}")
+        mapping_data = load_mapping_file(center_id)
+        _schema_cache[center_id] = mapping_to_schema(mapping_data)
+        logger.info(f"Loaded {len(_schema_cache[center_id].tables)} tables")
 
     return _schema_cache[center_id]
 
 
 def clear_cache():
-    """Clear the schema cache (useful for testing)."""
+    """Clear the schema cache."""
     _schema_cache.clear()
+
+
+def list_available_mappings(mappings_dir: Path | None = None) -> list[str]:
+    """List all available mapping files."""
+    if mappings_dir is None:
+        mappings_dir = MAPPINGS_DIR
+
+    if not mappings_dir.exists():
+        return []
+
+    return [
+        f.stem.replace("_mapping", "")
+        for f in mappings_dir.glob("*_mapping.json")
+    ]
