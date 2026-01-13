@@ -5,35 +5,23 @@
     <!-- Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Explore Centers</h1>
-        <p class="text-slate-600 dark:text-slate-400 mt-2">Browse dental center databases and extracted data</p>
+        <p class="text-slate-600 dark:text-slate-400 mt-2">Browse dental center schema mappings</p>
     </div>
 
-    <!-- Controls -->
+    <!-- Center Selection -->
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
-        <div class="flex items-end gap-4 flex-wrap">
-            <div class="flex-1 min-w-[200px]">
-                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Center</label>
-                <select id="center-select" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                    <option value="">Loading centers...</option>
-                </select>
-            </div>
-            <div class="w-48">
-                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Date</label>
-                <input type="date" id="date-input" value="2022-01-18"
-                       class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-            </div>
-            <button id="load-btn"
-                    class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
-                Load Data
-            </button>
-        </div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Center</label>
+        <select id="center-select" class="w-full max-w-md px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            <option value="">Loading centers...</option>
+        </select>
     </div>
 
-    <!-- Center Info & Schema -->
-    <div id="center-info" class="hidden mb-6">
-        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+    <!-- Center Info & Schema (shows automatically) -->
+    <div id="center-info" class="hidden">
+        <!-- Center Details Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
             <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4" id="center-name">Center Details</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <span class="text-sm text-slate-500 dark:text-slate-400">ID</span>
                     <p class="font-medium text-slate-900 dark:text-white" id="info-id">-</p>
@@ -51,47 +39,39 @@
                     <p class="font-medium" id="info-mapping">-</p>
                 </div>
             </div>
+        </div>
 
-            <!-- Schema Mapping -->
-            <div id="schema-section" class="hidden">
-                <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-3">Schema Mapping</h3>
-                <div class="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 overflow-x-auto">
+        <!-- Table Selection -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Table</label>
+            <select id="table-select" class="w-full max-w-md px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <option value="">Select a table...</option>
+            </select>
+        </div>
+
+        <!-- Table Mapping Details -->
+        <div id="table-details" class="hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+                        <span class="text-primary-600 dark:text-primary-400" id="table-canonical">TABLE</span>
+                        <span class="text-slate-400 mx-2">→</span>
+                        <span class="font-mono" id="table-actual">actual_table</span>
+                    </h3>
+                </div>
+
+                <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
-                            <tr class="border-b border-slate-200 dark:border-slate-600">
-                                <th class="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Canonical Table</th>
-                                <th class="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Actual Table</th>
-                                <th class="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Columns</th>
+                            <tr class="border-b border-slate-200 dark:border-slate-700">
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Canonical Column</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Actual Column</th>
                             </tr>
                         </thead>
-                        <tbody id="schema-table">
+                        <tbody id="columns-table">
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Results -->
-    <div id="results-section" class="hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Extracted Entries</h2>
-                <span id="results-count" class="text-sm text-slate-500 dark:text-slate-400">0 entries</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-200 dark:border-slate-700">
-                            <th class="text-left py-3 px-3 font-medium text-slate-600 dark:text-slate-400">Patient ID</th>
-                            <th class="text-left py-3 px-3 font-medium text-slate-600 dark:text-slate-400">Date</th>
-                            <th class="text-left py-3 px-3 font-medium text-slate-600 dark:text-slate-400">Insurance</th>
-                            <th class="text-left py-3 px-3 font-medium text-slate-600 dark:text-slate-400">Entry</th>
-                        </tr>
-                    </thead>
-                    <tbody id="results-table">
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
@@ -104,7 +84,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span class="mt-4 text-slate-600 dark:text-slate-400">Loading data...</span>
+                <span class="mt-4 text-slate-600 dark:text-slate-400">Loading...</span>
             </div>
         </div>
     </div>
@@ -121,12 +101,13 @@
 {% block scripts %}
 <script>
     const centerSelect = document.getElementById('center-select');
-    const dateInput = document.getElementById('date-input');
-    const loadBtn = document.getElementById('load-btn');
+    const tableSelect = document.getElementById('table-select');
     const centerInfo = document.getElementById('center-info');
-    const resultsSection = document.getElementById('results-section');
+    const tableDetails = document.getElementById('table-details');
     const loading = document.getElementById('loading');
     const error = document.getElementById('error');
+
+    let currentMapping = null;
 
     // Load centers on page load
     async function loadCenters() {
@@ -149,12 +130,17 @@
         }
     }
 
-    // Load center details
+    // Load center details automatically when selected
     async function loadCenterDetails(centerId) {
         if (!centerId) {
             centerInfo.classList.add('hidden');
+            tableDetails.classList.add('hidden');
             return;
         }
+
+        loading.classList.remove('hidden');
+        centerInfo.classList.add('hidden');
+        error.classList.add('hidden');
 
         try {
             const response = await fetch(`/api/centers/${centerId}`);
@@ -172,90 +158,28 @@
                     ? 'font-medium text-green-600'
                     : 'font-medium text-yellow-600';
 
-                // Show schema mapping
-                const schemaSection = document.getElementById('schema-section');
-                const schemaTable = document.getElementById('schema-table');
-                schemaTable.innerHTML = '';
+                currentMapping = data.mapping;
 
-                for (const [canonical, tableData] of Object.entries(data.mapping.tables || {})) {
-                    const columns = Object.entries(tableData.columns || {})
-                        .map(([c, d]) => `${c} → ${d.actual_name}`)
-                        .join(', ');
-
-                    const row = document.createElement('tr');
-                    row.className = 'border-b border-slate-100 dark:border-slate-600';
-                    row.innerHTML = `
-                        <td class="py-2 px-3 font-mono text-primary-600 dark:text-primary-400">${canonical}</td>
-                        <td class="py-2 px-3 font-mono text-slate-900 dark:text-white">${tableData.actual_name}</td>
-                        <td class="py-2 px-3 text-slate-600 dark:text-slate-400 text-xs">${columns}</td>
-                    `;
-                    schemaTable.appendChild(row);
+                // Populate table dropdown
+                tableSelect.innerHTML = '<option value="">Select a table...</option>';
+                for (const tableName of Object.keys(data.mapping.tables || {})) {
+                    const option = document.createElement('option');
+                    option.value = tableName;
+                    option.textContent = tableName;
+                    tableSelect.appendChild(option);
                 }
 
-                schemaSection.classList.remove('hidden');
+                tableDetails.classList.add('hidden');
             } else {
                 mappingEl.textContent = 'Not Available';
                 mappingEl.className = 'font-medium text-red-600';
-                document.getElementById('schema-section').classList.add('hidden');
+                currentMapping = null;
+                tableSelect.innerHTML = '<option value="">No mapping available</option>';
             }
 
             centerInfo.classList.remove('hidden');
         } catch (err) {
             console.error('Failed to load center details:', err);
-        }
-    }
-
-    // Load extracted data
-    async function loadData() {
-        const centerId = centerSelect.value;
-        const date = dateInput.value;
-
-        if (!centerId) {
-            alert('Please select a center');
-            return;
-        }
-
-        loading.classList.remove('hidden');
-        resultsSection.classList.add('hidden');
-        error.classList.add('hidden');
-
-        try {
-            const response = await fetch(`/api/extract?date=${date}&centers=${centerId}`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Failed to extract data');
-            }
-
-            // Find the center's data
-            const centerData = data.centers.find(c => c.center_id === centerId);
-
-            if (centerData && centerData.entries) {
-                const resultsTable = document.getElementById('results-table');
-                resultsTable.innerHTML = '';
-
-                centerData.entries.forEach(entry => {
-                    const row = document.createElement('tr');
-                    row.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50';
-                    row.innerHTML = `
-                        <td class="py-3 px-3 font-mono text-slate-900 dark:text-white">${entry.patient_id || '-'}</td>
-                        <td class="py-3 px-3 text-slate-900 dark:text-white">${entry.date || '-'}</td>
-                        <td class="py-3 px-3">
-                            <span class="px-2 py-1 rounded text-xs font-medium
-                                ${entry.insurance_type === 'Privat' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'}">
-                                ${entry.insurance_type || '-'}
-                            </span>
-                        </td>
-                        <td class="py-3 px-3 max-w-md truncate text-slate-700 dark:text-slate-300">${entry.entry || '-'}</td>
-                    `;
-                    resultsTable.appendChild(row);
-                });
-
-                document.getElementById('results-count').textContent =
-                    `${centerData.entries.length} entries (${centerData.duration_ms}ms)`;
-                resultsSection.classList.remove('hidden');
-            }
-        } catch (err) {
             document.getElementById('error-message').textContent = err.message;
             error.classList.remove('hidden');
         } finally {
@@ -263,9 +187,41 @@
         }
     }
 
+    // Show table mapping details
+    function showTableDetails(tableName) {
+        if (!tableName || !currentMapping) {
+            tableDetails.classList.add('hidden');
+            return;
+        }
+
+        const tableData = currentMapping.tables[tableName];
+        if (!tableData) {
+            tableDetails.classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('table-canonical').textContent = tableName;
+        document.getElementById('table-actual').textContent = tableData.actual_name;
+
+        const tbody = document.getElementById('columns-table');
+        tbody.innerHTML = '';
+
+        for (const [canonical, colData] of Object.entries(tableData.columns || {})) {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100 dark:border-slate-700';
+            row.innerHTML = `
+                <td class="py-3 px-4 font-mono text-primary-600 dark:text-primary-400">${canonical}</td>
+                <td class="py-3 px-4 font-mono text-slate-900 dark:text-white">${colData.actual_name}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        tableDetails.classList.remove('hidden');
+    }
+
     // Event listeners
     centerSelect.addEventListener('change', () => loadCenterDetails(centerSelect.value));
-    loadBtn.addEventListener('click', loadData);
+    tableSelect.addEventListener('change', () => showTableDetails(tableSelect.value));
 
     // Initial load
     loadCenters();
