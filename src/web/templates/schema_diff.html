@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Schema Diff</h1>
+        <p class="text-slate-600 dark:text-slate-400 mt-2">Compare ground truth schema vs discovered mapping accuracy</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
+        <div class="flex items-end gap-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Center</label>
+                <select id="center-select" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <option value="">Loading centers...</option>
+                </select>
+            </div>
+            <button id="compare-btn"
+                    class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
+                Compare Schemas
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div id="summary-section" class="hidden mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Tables Matched</p>
+                <p class="text-3xl font-bold text-green-600" id="stat-tables">0/0</p>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Columns Matched</p>
+                <p class="text-3xl font-bold text-green-600" id="stat-columns">0/0</p>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Accuracy</p>
+                <p class="text-3xl font-bold" id="stat-accuracy">-</p>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Status</p>
+                <p class="text-3xl font-bold" id="stat-status">-</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diff View -->
+    <div id="diff-section" class="hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">Schema Comparison</h2>
+
+            <div class="space-y-6" id="diff-content">
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-12">
+            <div class="flex flex-col items-center justify-center">
+                <svg class="spinner w-10 h-10 text-primary-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="mt-4 text-slate-600 dark:text-slate-400">Comparing schemas...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Ground Truth -->
+    <div id="no-ground-truth" class="hidden">
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6 text-center">
+            <p class="text-yellow-700 dark:text-yellow-400">No ground truth available for this center. Run generate_test_dbs.py first.</p>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden">
+        <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
+            <p class="text-red-700 dark:text-red-400" id="error-message">An error occurred</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const centerSelect = document.getElementById('center-select');
+    const compareBtn = document.getElementById('compare-btn');
+    const summarySection = document.getElementById('summary-section');
+    const diffSection = document.getElementById('diff-section');
+    const loading = document.getElementById('loading');
+    const noGroundTruth = document.getElementById('no-ground-truth');
+    const error = document.getElementById('error');
+
+    // Load centers
+    async function loadCenters() {
+        try {
+            const response = await fetch('/api/centers');
+            const data = await response.json();
+
+            centerSelect.innerHTML = '<option value="">Select a center...</option>';
+            data.centers.forEach(center => {
+                const option = document.createElement('option');
+                option.value = center.id;
+                option.textContent = `${center.name} - ${center.city}`;
+                centerSelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Failed to load centers:', err);
+        }
+    }
+
+    // Compare schemas
+    async function compareSchemas() {
+        const centerId = centerSelect.value;
+        if (!centerId) {
+            alert('Please select a center');
+            return;
+        }
+
+        loading.classList.remove('hidden');
+        summarySection.classList.add('hidden');
+        diffSection.classList.add('hidden');
+        noGroundTruth.classList.add('hidden');
+        error.classList.add('hidden');
+
+        try {
+            const response = await fetch(`/api/schema-diff/${centerId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    noGroundTruth.classList.remove('hidden');
+                    return;
+                }
+                throw new Error(data.detail || 'Failed to compare schemas');
+            }
+
+            displayDiff(data);
+        } catch (err) {
+            document.getElementById('error-message').textContent = err.message;
+            error.classList.remove('hidden');
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+
+    // Display diff results
+    function displayDiff(data) {
+        // Update summary
+        document.getElementById('stat-tables').textContent = `${data.tables_matched}/${data.tables_total}`;
+        document.getElementById('stat-columns').textContent = `${data.columns_matched}/${data.columns_total}`;
+
+        const accuracy = data.accuracy;
+        const accuracyEl = document.getElementById('stat-accuracy');
+        accuracyEl.textContent = `${accuracy}%`;
+        accuracyEl.className = accuracy === 100 ? 'text-3xl font-bold text-green-600' :
+                               accuracy >= 80 ? 'text-3xl font-bold text-yellow-600' :
+                               'text-3xl font-bold text-red-600';
+
+        const statusEl = document.getElementById('stat-status');
+        statusEl.textContent = accuracy === 100 ? 'PERFECT' : accuracy >= 80 ? 'GOOD' : 'NEEDS REVIEW';
+        statusEl.className = accuracy === 100 ? 'text-3xl font-bold text-green-600' :
+                             accuracy >= 80 ? 'text-3xl font-bold text-yellow-600' :
+                             'text-3xl font-bold text-red-600';
+
+        // Build diff content
+        const diffContent = document.getElementById('diff-content');
+        diffContent.innerHTML = '';
+
+        for (const [tableName, tableData] of Object.entries(data.tables)) {
+            const tableDiv = document.createElement('div');
+            tableDiv.className = 'border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden';
+
+            const isMatch = tableData.ground_truth === tableData.mapping;
+            const headerBg = isMatch ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30';
+            const headerBorder = isMatch ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800';
+
+            tableDiv.innerHTML = `
+                <div class="px-4 py-3 ${headerBg} border-b ${headerBorder}">
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono font-bold text-slate-900 dark:text-white">${tableName}</span>
+                        <span class="text-sm ${isMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+                            ${isMatch ? '✓ Match' : '✗ Mismatch'}
+                        </span>
+                    </div>
+                    <div class="mt-2 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-slate-500 dark:text-slate-400">Ground Truth:</span>
+                            <span class="ml-2 font-mono text-slate-900 dark:text-white">${tableData.ground_truth || '-'}</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 dark:text-slate-400">Discovered:</span>
+                            <span class="ml-2 font-mono text-slate-900 dark:text-white">${tableData.mapping || '-'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 dark:border-slate-700">
+                                <th class="text-left py-2 px-2 font-medium text-slate-600 dark:text-slate-400">Column</th>
+                                <th class="text-left py-2 px-2 font-medium text-slate-600 dark:text-slate-400">Ground Truth</th>
+                                <th class="text-left py-2 px-2 font-medium text-slate-600 dark:text-slate-400">Discovered</th>
+                                <th class="text-right py-2 px-2 font-medium text-slate-600 dark:text-slate-400">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(tableData.columns || {}).map(([colName, colData]) => {
+                                const colMatch = colData.ground_truth === colData.mapping;
+                                return `
+                                    <tr class="border-b border-slate-100 dark:border-slate-700">
+                                        <td class="py-2 px-2 font-mono text-primary-600 dark:text-primary-400">${colName}</td>
+                                        <td class="py-2 px-2 font-mono text-slate-900 dark:text-white">${colData.ground_truth || '-'}</td>
+                                        <td class="py-2 px-2 font-mono text-slate-900 dark:text-white">${colData.mapping || '-'}</td>
+                                        <td class="py-2 px-2 text-right">
+                                            ${colMatch
+                                                ? '<span class="text-green-600 dark:text-green-400">✓</span>'
+                                                : '<span class="text-red-600 dark:text-red-400">✗</span>'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            diffContent.appendChild(tableDiv);
+        }
+
+        summarySection.classList.remove('hidden');
+        diffSection.classList.remove('hidden');
+    }
+
+    // Event listeners
+    compareBtn.addEventListener('click', compareSchemas);
+
+    // Initial load
+    loadCenters();
+</script>
+{% endblock %}

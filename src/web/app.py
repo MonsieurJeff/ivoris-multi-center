@@ -27,6 +27,7 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 MAPPINGS_DIR = DATA_DIR / "mappings"
+GROUND_TRUTH_DIR = DATA_DIR / "ground_truth"
 
 # Create FastAPI app
 app = FastAPI(
@@ -93,6 +94,19 @@ async def metrics_page(request: Request):
             "request": request,
             "page": "metrics",
             "title": "Metrics Dashboard",
+        },
+    )
+
+
+@app.get("/schema-diff", response_class=HTMLResponse)
+async def schema_diff_page(request: Request):
+    """Compare ground truth vs discovered schema."""
+    return templates.TemplateResponse(
+        "schema_diff.html",
+        {
+            "request": request,
+            "page": "schema-diff",
+            "title": "Schema Diff",
         },
     )
 
@@ -264,6 +278,104 @@ async def run_benchmark():
         "target_ms": target_ms,
         "passed": passed,
         "timing": timing,
+    }
+
+
+@app.get("/api/schema-diff/{center_id}")
+async def get_schema_diff(center_id: str):
+    """Compare ground truth schema vs discovered mapping for a center."""
+    config = get_config()
+    center = config.get_center(center_id)
+
+    if not center:
+        raise HTTPException(status_code=404, detail=f"Center not found: {center_id}")
+
+    # Load ground truth
+    ground_truth_file = GROUND_TRUTH_DIR / f"{center_id}_schema.json"
+    if not ground_truth_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No ground truth for {center_id}. Run generate_test_dbs.py first.",
+        )
+
+    with open(ground_truth_file) as f:
+        ground_truth = json.load(f)
+
+    # Load mapping
+    mapping_file = MAPPINGS_DIR / f"{center_id}_mapping.json"
+    mapping = None
+    if mapping_file.exists():
+        with open(mapping_file) as f:
+            mapping = json.load(f)
+
+    # Compare schemas
+    tables_matched = 0
+    tables_total = 0
+    columns_matched = 0
+    columns_total = 0
+    tables_diff = {}
+
+    # Get canonical tables from ground truth
+    gt_tables = ground_truth.get("tables", {})
+
+    for canonical_table, gt_data in gt_tables.items():
+        tables_total += 1
+        gt_actual = gt_data.get("actual_name", "")
+
+        # Get mapping data
+        mapping_actual = ""
+        mapping_columns = {}
+        if mapping and canonical_table in mapping.get("tables", {}):
+            mapping_actual = mapping["tables"][canonical_table].get("actual_name", "")
+            mapping_columns = {
+                col: data.get("actual_name", "")
+                for col, data in mapping["tables"][canonical_table]
+                .get("columns", {})
+                .items()
+            }
+
+        table_match = gt_actual == mapping_actual
+        if table_match:
+            tables_matched += 1
+
+        # Compare columns
+        columns_diff = {}
+        gt_columns = gt_data.get("columns", {})
+
+        for canonical_col, gt_col_actual in gt_columns.items():
+            columns_total += 1
+            mapping_col_actual = mapping_columns.get(canonical_col, "")
+
+            col_match = gt_col_actual == mapping_col_actual
+            if col_match:
+                columns_matched += 1
+
+            columns_diff[canonical_col] = {
+                "ground_truth": gt_col_actual,
+                "mapping": mapping_col_actual,
+                "match": col_match,
+            }
+
+        tables_diff[canonical_table] = {
+            "ground_truth": gt_actual,
+            "mapping": mapping_actual,
+            "match": table_match,
+            "columns": columns_diff,
+        }
+
+    # Calculate accuracy
+    total_items = tables_total + columns_total
+    matched_items = tables_matched + columns_matched
+    accuracy = round((matched_items / total_items * 100) if total_items > 0 else 0)
+
+    return {
+        "center_id": center_id,
+        "tables_matched": tables_matched,
+        "tables_total": tables_total,
+        "columns_matched": columns_matched,
+        "columns_total": columns_total,
+        "accuracy": accuracy,
+        "tables": tables_diff,
     }
 
 
