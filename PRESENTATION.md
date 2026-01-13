@@ -2,6 +2,12 @@
 
 **Duration Target**: 5-7 minutes
 
+> **Related Documents:**
+> - [Full Script](docs/presentation/SCRIPT.md) - Enhanced talking points with timing
+> - [Story Guide](docs/presentation/STORY.md) - Narrative arc for storytelling
+> - [Cheat Sheet](docs/presentation/CHEAT_SHEET.md) - Commands, code, and file reference
+> - [Demo Checklist](docs/presentation/DEMO_CHECKLIST.md) - Pre-recording setup
+
 ---
 
 ## Part 1: Problem Statement (30 seconds)
