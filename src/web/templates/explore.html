@@ -110,7 +110,9 @@
                 </div>
 
                 <div id="data-error" class="hidden py-8 text-center">
-                    <p class="text-red-600 dark:text-red-400" id="data-error-message">Failed to load data</p>
+                    <p class="text-red-600 dark:text-red-400 font-medium mb-2">Database Connection Failed</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400" id="data-error-message">Failed to load data</p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mt-2">Make sure Docker SQL Server is running: <code class="bg-slate-100 dark:bg-slate-700 px-1 rounded">docker-compose up -d</code></p>
                 </div>
 
                 <div id="data-empty" class="hidden py-8 text-center">
@@ -314,6 +316,14 @@
 
             // Find entries for current center
             const centerData = dataCache.centers?.find(c => c.center_id === currentCenterId);
+
+            // Check for extraction error
+            if (centerData && !centerData.success) {
+                document.getElementById('data-error-message').textContent = centerData.error || 'Extraction failed';
+                dataError.classList.remove('hidden');
+                return;
+            }
+
             const entries = centerData?.entries || [];
 
             document.getElementById('data-count').textContent = `${entries.length} entries`;
