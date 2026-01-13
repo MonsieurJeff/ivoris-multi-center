@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900">Metrics Dashboard</h1>
+        <p class="text-slate-600 mt-2">Performance metrics and extraction statistics</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+        <div class="flex items-end gap-4 flex-wrap">
+            <div class="flex-1 min-w-[300px]">
+                <label class="block text-sm font-medium text-slate-700 mb-2">
+                    Select Centers
+                    <span class="text-slate-400 font-normal">(multi-select)</span>
+                </label>
+                <div id="center-checkboxes" class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
+                    <p class="text-slate-500 text-sm">Loading centers...</p>
+                </div>
+            </div>
+            <div class="w-48">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Date</label>
+                <input type="date" id="date-input" value="2022-01-18"
+                       class="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div class="flex gap-2">
+                <button id="select-all-btn"
+                        class="px-4 py-2.5 bg-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-300 transition-colors">
+                    Select All
+                </button>
+                <button id="run-btn"
+                        class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
+                    Run Extraction
+                </button>
+                <button id="benchmark-btn"
+                        class="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors">
+                    Benchmark
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div id="summary-cards" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <p class="text-sm text-slate-500 mb-1">Total Centers</p>
+            <p class="text-3xl font-bold text-slate-900" id="stat-centers">0</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <p class="text-sm text-slate-500 mb-1">Total Entries</p>
+            <p class="text-3xl font-bold text-slate-900" id="stat-entries">0</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <p class="text-sm text-slate-500 mb-1">Total Duration</p>
+            <p class="text-3xl font-bold text-slate-900" id="stat-duration">0ms</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <p class="text-sm text-slate-500 mb-1">Status</p>
+            <p class="text-3xl font-bold" id="stat-status">-</p>
+        </div>
+    </div>
+
+    <!-- Per-Center Results -->
+    <div id="results-section" class="hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 class="text-xl font-semibold text-slate-900 mb-4">Per-Center Performance</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200">
+                            <th class="text-left py-3 px-3 font-medium text-slate-600">Status</th>
+                            <th class="text-left py-3 px-3 font-medium text-slate-600">Center</th>
+                            <th class="text-left py-3 px-3 font-medium text-slate-600">City</th>
+                            <th class="text-right py-3 px-3 font-medium text-slate-600">Entries</th>
+                            <th class="text-right py-3 px-3 font-medium text-slate-600">Duration</th>
+                            <th class="text-left py-3 px-3 font-medium text-slate-600">Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+        <div class="flex items-center justify-center py-12">
+            <svg class="spinner w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="ml-3 text-slate-600">Running extraction...</span>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden">
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <p class="text-red-700" id="error-message">An error occurred</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const centerCheckboxes = document.getElementById('center-checkboxes');
+    const dateInput = document.getElementById('date-input');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const runBtn = document.getElementById('run-btn');
+    const benchmarkBtn = document.getElementById('benchmark-btn');
+    const summaryCards = document.getElementById('summary-cards');
+    const resultsSection = document.getElementById('results-section');
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+
+    let allCenters = [];
+
+    // Load centers on page load
+    async function loadCenters() {
+        try {
+            const response = await fetch('/api/centers');
+            const data = await response.json();
+            allCenters = data.centers;
+
+            centerCheckboxes.innerHTML = '';
+
+            // Group by country (based on center ID ranges)
+            const groups = {
+                'Germany (20)': data.centers.filter(c => parseInt(c.id.split('_')[1]) <= 20),
+                'Austria (5)': data.centers.filter(c => {
+                    const n = parseInt(c.id.split('_')[1]);
+                    return n >= 21 && n <= 25;
+                }),
+                'Switzerland (5)': data.centers.filter(c => parseInt(c.id.split('_')[1]) >= 26),
+            };
+
+            for (const [groupName, centers] of Object.entries(groups)) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'mb-3';
+                groupDiv.innerHTML = `<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">${groupName}</p>`;
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 gap-1';
+
+                centers.forEach(center => {
+                    const label = document.createElement('label');
+                    label.className = `flex items-center p-1.5 rounded hover:bg-white cursor-pointer ${!center.has_mapping ? 'opacity-50' : ''}`;
+                    label.innerHTML = `
+                        <input type="checkbox" value="${center.id}" class="center-cb mr-2 rounded border-slate-300"
+                               ${!center.has_mapping ? 'disabled' : ''}>
+                        <span class="text-sm truncate">${center.city}</span>
+                    `;
+                    grid.appendChild(label);
+                });
+
+                groupDiv.appendChild(grid);
+                centerCheckboxes.appendChild(groupDiv);
+            }
+        } catch (err) {
+            console.error('Failed to load centers:', err);
+            centerCheckboxes.innerHTML = '<p class="text-red-500 text-sm">Error loading centers</p>';
+        }
+    }
+
+    // Get selected center IDs
+    function getSelectedCenters() {
+        const checkboxes = document.querySelectorAll('.center-cb:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    // Select all centers
+    function selectAll() {
+        const checkboxes = document.querySelectorAll('.center-cb:not(:disabled)');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+    }
+
+    // Display results
+    function displayResults(data, isBenchmark = false) {
+        // Update summary
+        document.getElementById('stat-centers').textContent = data.total_centers;
+        document.getElementById('stat-entries').textContent = data.total_entries;
+        document.getElementById('stat-duration').textContent = `${data.total_duration_ms}ms`;
+
+        const statusEl = document.getElementById('stat-status');
+        if (isBenchmark) {
+            statusEl.textContent = data.passed ? 'PASS' : 'FAIL';
+            statusEl.className = data.passed ? 'text-3xl font-bold text-green-600' : 'text-3xl font-bold text-red-600';
+        } else {
+            const successRate = (data.successful_centers / data.total_centers * 100).toFixed(0);
+            statusEl.textContent = `${successRate}%`;
+            statusEl.className = successRate === '100' ? 'text-3xl font-bold text-green-600' : 'text-3xl font-bold text-yellow-600';
+        }
+
+        // Update table
+        const tbody = document.getElementById('results-table');
+        tbody.innerHTML = '';
+
+        const timing = isBenchmark ? data.timing : data.centers;
+        const maxDuration = Math.max(...timing.map(t => t.duration_ms));
+
+        timing.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100 hover:bg-slate-50';
+
+            const barWidth = (item.duration_ms / maxDuration * 100).toFixed(0);
+            const barColor = item.duration_ms < 50 ? 'bg-green-500' : item.duration_ms < 100 ? 'bg-yellow-500' : 'bg-red-500';
+
+            row.innerHTML = `
+                <td class="py-3 px-3">
+                    ${item.success
+                        ? '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600">✓</span>'
+                        : '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600">✗</span>'}
+                </td>
+                <td class="py-3 px-3 font-medium">${item.center_name || item.center_id}</td>
+                <td class="py-3 px-3 text-slate-600">${allCenters.find(c => c.id === item.center_id)?.city || '-'}</td>
+                <td class="py-3 px-3 text-right font-mono">${item.entries_count}</td>
+                <td class="py-3 px-3 text-right font-mono">${item.duration_ms.toFixed(0)}ms</td>
+                <td class="py-3 px-3 w-48">
+                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div class="h-full ${barColor} rounded-full" style="width: ${barWidth}%"></div>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        summaryCards.classList.remove('hidden');
+        resultsSection.classList.remove('hidden');
+    }
+
+    // Run extraction
+    async function runExtraction() {
+        const selectedCenters = getSelectedCenters();
+        const date = dateInput.value;
+
+        if (selectedCenters.length === 0) {
+            alert('Please select at least one center');
+            return;
+        }
+
+        loading.classList.remove('hidden');
+        summaryCards.classList.add('hidden');
+        resultsSection.classList.add('hidden');
+        error.classList.add('hidden');
+
+        try {
+            const response = await fetch(`/api/extract?date=${date}&centers=${selectedCenters.join(',')}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to extract data');
+            }
+
+            displayResults(data, false);
+        } catch (err) {
+            document.getElementById('error-message').textContent = err.message;
+            error.classList.remove('hidden');
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+
+    // Run benchmark
+    async function runBenchmark() {
+        loading.classList.remove('hidden');
+        summaryCards.classList.add('hidden');
+        resultsSection.classList.add('hidden');
+        error.classList.add('hidden');
+
+        try {
+            const response = await fetch('/api/benchmark');
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to run benchmark');
+            }
+
+            displayResults(data, true);
+        } catch (err) {
+            document.getElementById('error-message').textContent = err.message;
+            error.classList.remove('hidden');
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+
+    // Event listeners
+    selectAllBtn.addEventListener('click', selectAll);
+    runBtn.addEventListener('click', runExtraction);
+    benchmarkBtn.addEventListener('click', runBenchmark);
+
+    // Initial load
+    loadCenters();
+</script>
+{% endblock %}

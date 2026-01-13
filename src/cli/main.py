@@ -7,6 +7,7 @@ Workflow:
 3. generate-mappings       - Create mapping files (for manual review)
 4. extract                 - Extract data using mappings
 5. benchmark               - Performance test
+6. web                     - Start web UI
 """
 
 import argparse
@@ -231,6 +232,27 @@ def cmd_benchmark(args, config):
     return 0
 
 
+def cmd_web(args, config):
+    """Start the web UI server."""
+    import uvicorn
+
+    print(f"\n{'='*60}")
+    print(f"Starting Ivoris Multi-Center Web UI")
+    print(f"{'='*60}")
+    print(f"\nServer: http://localhost:{args.port}")
+    print(f"Press Ctrl+C to stop\n")
+
+    uvicorn.run(
+        "src.web.app:app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        log_level="info",
+    )
+
+    return 0
+
+
 def cmd_list(args, config):
     """List all configured centers."""
     print(f"\n{'='*60}")
@@ -328,6 +350,18 @@ Workflow:
     # list command
     list_parser = subparsers.add_parser("list", help="List configured centers")
 
+    # web command
+    web_parser = subparsers.add_parser("web", help="Start web UI server")
+    web_parser.add_argument(
+        "--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)"
+    )
+    web_parser.add_argument(
+        "--port", "-p", type=int, default=8000, help="Port to bind (default: 8000)"
+    )
+    web_parser.add_argument(
+        "--reload", "-r", action="store_true", help="Enable auto-reload for development"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -349,6 +383,7 @@ Workflow:
         "extract": cmd_extract,
         "benchmark": cmd_benchmark,
         "list": cmd_list,
+        "web": cmd_web,
     }
 
     return commands[args.command](args, config)

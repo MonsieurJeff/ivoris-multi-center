@@ -7,9 +7,10 @@ pyodbc>=5.0.0
 pyyaml>=6.0
 python-dotenv>=1.0.0
 
-# Web API (optional)
+# Web API
 fastapi>=0.109.0
 uvicorn>=0.27.0
+jinja2>=3.1.0
 
 # Development
 pytest>=7.0.0

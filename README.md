@@ -87,7 +87,29 @@ python -m src.cli extract --workers 10
 
 # Benchmark performance
 python -m src.cli benchmark
+
+# Start Web UI
+python -m src.cli web
+python -m src.cli web --port 8080
+python -m src.cli web --reload  # Development mode
 ```
+
+---
+
+## Web UI
+
+Start the web interface for exploring centers and viewing metrics:
+
+```bash
+python -m src.cli web
+```
+
+Then open http://localhost:8000 in your browser.
+
+### Pages
+
+- **Explore Centers**: Browse individual centers, view schema mappings, extract data
+- **Metrics Dashboard**: Multi-select centers, run extractions, benchmark performance
 
 ---
 
@@ -190,6 +212,7 @@ python -m src.cli benchmark
 - **Ground Truth Separation**: Generator saves actual schema to `data/ground_truth/`
 - **Parallel Extraction**: ThreadPoolExecutor for concurrent database access
 - **Unified Output**: All centers output to same canonical format
+- **Web UI**: FastAPI-based interface for exploring centers and metrics
 - **Performance Target**: <5 seconds for 30 centers (actual: ~380ms with pre-loaded mappings)
 
 ---
@@ -203,16 +226,25 @@ ivoris-multi-center/
 │   │   └── main.py
 │   ├── core/             # Core components
 │   │   ├── config.py     # Configuration loader
-│   │   ├── introspector.py  # Schema discovery
+│   │   ├── discovery.py  # Raw schema discovery
+│   │   ├── introspector.py  # Schema mapping loader
 │   │   └── schema_mapping.py
 │   ├── adapters/         # Database adapters
 │   │   └── center_adapter.py
 │   ├── services/         # Business logic
-│   │   └── extraction.py # Parallel extraction
-│   └── models/           # Data models
-│       └── chart_entry.py
+│   │   ├── extraction.py # Parallel extraction
+│   │   └── mapping_generator.py
+│   ├── models/           # Data models
+│   │   └── chart_entry.py
+│   └── web/              # Web UI
+│       ├── app.py        # FastAPI application
+│       ├── templates/    # Jinja2 HTML templates
+│       └── static/       # CSS/JS assets
 ├── config/
 │   └── centers.yml       # Center configuration
+├── data/
+│   ├── mappings/         # Per-center mapping files
+│   └── ground_truth/     # Generated schema reference
 ├── scripts/
 │   └── generate_test_dbs.py  # Test data generator
 ├── docker-compose.yml    # SQL Server container
