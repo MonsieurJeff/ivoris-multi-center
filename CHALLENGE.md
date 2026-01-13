@@ -1,297 +1,220 @@
-# Ivoris Multi-Center Extraction Pipeline
+# Ivoris Extraction Pipeline Challenge
 
-**Extension Challenge** | Clinero Interview | Jean-Francois Desjardins
+**Clinero Interview** | Jean-Francois Desjardins | January 2026
 
 ---
 
-## Relationship to Main Challenge
+## Overview
 
-This project extends the **[ivoris-pipeline](../ivoris-pipeline)** main challenge:
+This challenge has two parts:
 
-| Aspect | Main Challenge | This Extension |
-|--------|----------------|----------------|
-| **Scope** | 1 database | 30 databases |
-| **Schema** | Standard names | Random names per center |
-| **Discovery** | Static | Pattern-based introspection |
-| **Output** | Same 5 fields | Same 5 fields + center_id |
+| Part | Challenge | Scope | Status |
+|------|-----------|-------|--------|
+| **Part 1** | Daily Extraction Pipeline | 1 database, standard schema | ✅ Complete |
+| **Part 2** | Multi-Center Scale | 30 databases, random schemas | ✅ Complete |
 
-### Main Challenge Requirements (Solved in ivoris-pipeline)
+**Projects:**
+- Part 1: [ivoris-pipeline](../ivoris-pipeline)
+- Part 2: ivoris-multi-center (this project)
+
+---
+
+## Part 1: Daily Extraction Pipeline (Main Challenge)
+
+### Original Requirement
 
 > **Extraction-Pipeline für Ivoris bauen**
 >
+> Anforderung: Wenn User einen Karteikarteneintrag machen, soll täglich ein Update/Datenübertrag vorgenommen werden.
+>
 > Datenbedarf: Datum, Pat-ID, Versicherungsstatus, Karteikarteneintrag, Leistungen (Ziffern)
+>
 > Output: csv/json
 
-### Extension Question
+### Translation
 
-*"What happens at scale? What if there are 30 centers, each with different schema names?"*
+Build a data extraction pipeline that runs daily to transfer patient chart entries from Ivoris to external systems.
 
----
+### Required Fields
 
-## Challenge
+| # | German | English | Source Table | Description |
+|---|--------|---------|--------------|-------------|
+| 1 | Datum | Date | KARTEI.DATUM | Date of chart entry |
+| 2 | Pat-ID | Patient ID | KARTEI.PATIENTID | Patient identifier |
+| 3 | Versicherungsstatus | Insurance Status | KASSE.TYP | GKV/PKV/Selbstzahler |
+| 4 | Karteikarteneintrag | Chart Entry | KARTEI.EINTRAG | Medical record text |
+| 5 | Leistungen (Ziffern) | Services | LEISTUNG.LEISTUNG | Treatment codes |
 
-> **Multi-Center Schema Mapping & Extraction**
->
-> A dental group operates 30 centers across Germany, Austria, and Switzerland.
-> While the data structure is logically identical, each center's database
-> has randomly generated table and column names.
->
-> Build a unified extraction pipeline that:
-> 1. Discovers each center's unique schema via pattern matching
-> 2. Maps discovered schemas to a canonical model
-> 3. Extracts daily chart entries from all 30 centers in parallel
-> 4. Outputs unified data regardless of source schema
-
----
-
-## The Problem
-
-Each dental center has tables like:
-
-| Center | Patient Table | Chart Table | Patient ID Column | Date Column |
-|--------|--------------|-------------|-------------------|-------------|
-| Center 1 | PATIENT_A1 | KARTEI_A1 | PATNR_A1 | DATUM_A1 |
-| Center 2 | PATIENT_B2 | KARTEI_B2 | PATNR_B2 | DATUM_B2 |
-| Center 3 | PATIENT_C3 | KARTEI_C3 | PATNR_C3 | DATUM_C3 |
-| ... | ... | ... | ... | ... |
-| Center 10 | PATIENT_J0 | KARTEI_J0 | PATNR_J0 | DATUM_J0 |
-
-**Same logical data, different physical names.**
-
----
-
-## Requirements
-
-### Functional
-
-1. **Schema Auto-Discovery**
-   - Introspect database using `INFORMATION_SCHEMA`
-   - Detect tables by pattern matching (e.g., contains "KARTEI", "PATIENT")
-   - Map columns by base name (strip suffix to find canonical name)
-   - No manual YAML mapping files - fully automatic
-
-2. **Canonical Model**
-   - Define a standard schema that all centers map to
-   - Same ChartEntry model as original challenge
-
-3. **Unified Extraction**
-   - Extract from all 10 centers with a single command
-   - Output combined results or per-center files
-
-4. **Performance**
-   - Parallel extraction across centers
-   - Connection pooling per database
-   - Cache discovered schemas (don't introspect every run)
-   - Target: <5 seconds for 10 centers with 1000 records each
-
-### Technical
-
-- Python 3.11+
-- SQL Server 2019 (Docker)
-- Dynamic adapter generation from introspected schema
-- Factory pattern with schema caching
-
----
-
-## Architecture
+### Solution Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Multi-Center Pipeline                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐      ┌──────────┐    │
-│  │ Center 1 │  │ Center 2 │  │ Center 3 │ ...  │ Center 10│    │
-│  │ _A1      │  │ _B2      │  │ _C3      │      │ _J0      │    │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘      └────┬─────┘    │
-│       │             │             │                  │          │
-│       ▼             ▼             ▼                  ▼          │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              Schema Introspector (Auto-Discovery)         │   │
-│  │                                                           │   │
-│  │   1. Query INFORMATION_SCHEMA.TABLES                      │   │
-│  │   2. Pattern match: *KARTEI*, *PATIENT*, *KASSEN*         │   │
-│  │   3. Query INFORMATION_SCHEMA.COLUMNS                     │   │
-│  │   4. Strip suffix to find canonical column name           │   │
-│  │   5. Build SchemaMapping object                           │   │
-│  │   6. Cache for performance                                │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                   Adapter Factory                         │   │
-│  │   get_adapter("center_01")                                │   │
-│  │     → introspect schema                                   │   │
-│  │     → build CenterAdapter with discovered mapping         │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                  Canonical ChartEntry                     │   │
-│  │   date | patient_id | insurance_status | chart_entry      │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                  Unified Output                           │   │
-│  │            JSON / CSV with center_id field                │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   Ivoris    │────▶│  Extraction  │────▶│  CSV / JSON     │
+│   DentalDB  │     │   Service    │     │  Output Files   │
+└─────────────┘     └──────────────┘     └─────────────────┘
+      │                    │
+      ▼                    ▼
+┌─────────────┐     ┌──────────────┐
+│  Tables:    │     │  Combines:   │
+│  • KARTEI   │     │  • Date      │
+│  • PATIENT  │     │  • Patient   │
+│  • KASSE    │     │  • Insurance │
+│  • LEISTUNG │     │  • Entry     │
+└─────────────┘     │  • Services  │
+                    └──────────────┘
 ```
 
----
-
-## Schema Auto-Discovery Algorithm
-
-```python
-# Pseudo-code for schema introspection
-
-def discover_schema(connection) -> SchemaMapping:
-    # 1. Find tables by pattern
-    tables = query("""
-        SELECT TABLE_NAME
-        FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = 'ck'
-    """)
-
-    # 2. Match canonical tables
-    mapping = {}
-    for table in tables:
-        base_name = extract_base_name(table)  # KARTEI_A1 → KARTEI
-        if base_name in CANONICAL_TABLES:
-            mapping[base_name] = table
-
-    # 3. For each table, discover columns
-    for canonical, actual in mapping.items():
-        columns = query(f"""
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = '{actual}'
-        """)
-
-        for col in columns:
-            base_col = extract_base_name(col)  # PATNR_A1 → PATNR
-            mapping[f"{canonical}.{base_col}"] = col
-
-    return SchemaMapping(mapping)
-```
-
-**Pattern Matching Rules:**
-- Table: `KARTEI_XX` → canonical `KARTEI`
-- Column: `PATNR_XX` → canonical `PATNR`
-- Suffix detected by: last `_` + 2 alphanumeric chars
-
----
-
-## Schema Mapping Format
-
-```yaml
-# config/mappings/center_01.yml
-center_id: "center_01"
-suffix: "A1"
-database: "DentalDB_A1"
-
-tables:
-  patient: "PATIENT_A1"
-  chart: "KARTEI_A1"
-  insurance: "PATKASSE_A1"
-  insurance_provider: "KASSEN_A1"
-  service: "LEISTUNG_A1"
-
-columns:
-  patient:
-    id: "ID"
-    name: "P_NAME_A1"
-  chart:
-    id: "ID"
-    patient_ref: "PATNR_A1"
-    date: "DATUM_A1"
-    entry: "BEMERKUNG_A1"
-    deleted: "DELKZ"
-  insurance:
-    patient_ref: "PATNR_A1"
-    provider_ref: "KASSENID_A1"
-  insurance_provider:
-    id: "ID"
-    name: "NAME_A1"
-    type: "ART_A1"
-  service:
-    patient_ref: "PATIENTID_A1"
-    date: "DATUM_A1"
-    code: "LEISTUNG_A1"
-    deleted: "DELKZ"
-```
-
----
-
-## Deliverables
-
-1. **Database Generator** (`scripts/generate_test_dbs.py`)
-   - Creates 10 test databases with randomized schema names
-   - Populates with identical test data
-   - Generates random 2-char suffixes per center
-
-2. **Schema Introspector** (`src/core/introspector.py`)
-   - Queries INFORMATION_SCHEMA to discover tables/columns
-   - Pattern matching to identify canonical entities
-   - Caches discovered schemas for performance
-
-3. **Schema Mapping** (`src/core/schema_mapping.py`)
-   - Dataclass representing discovered schema
-   - Methods to translate canonical → actual names
-   - Generates SQL with correct table/column names
-
-4. **Center Adapter** (`src/adapters/center_adapter.py`)
-   - Single adapter class that uses SchemaMapping
-   - Factory method that introspects and builds adapter
-   - Connection pooling per center
-
-5. **Parallel Extractor** (`src/services/multi_extract.py`)
-   - ThreadPoolExecutor for parallel extraction
-   - Aggregates results from all centers
-   - Reports timing per center
-
-6. **CLI** (`src/main.py`)
-   - `--discover` - Show discovered schemas
-   - `--extract-all` - Extract from all centers
-   - `--center CENTER_ID` - Extract from specific center
-   - `--benchmark` - Performance test with timing
-
----
-
-## Success Criteria
-
-| Metric | Target |
-|--------|--------|
-| All 10 centers extracted | ✅ |
-| Unified output format | ✅ |
-| Schema mapping works | ✅ |
-| Parallel extraction | <5s for 10 centers |
-| Clean adapter pattern | ✅ |
-| OutrePilot quality standards | ✅ |
-
----
-
-## Bonus Points
-
-- [ ] Auto-discovery of schema (introspect database)
-- [ ] Hot-reload of mappings without restart
-- [ ] Async extraction with `asyncio` + `aioodbc`
-- [ ] REST API endpoint for extraction
-- [ ] Monitoring/metrics per center
-
----
-
-## Getting Started
+### Part 1 Commands
 
 ```bash
-# 1. Generate test databases
-python scripts/generate-test-dbs.py
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
 
-# 2. Run extraction
-python src/main.py --extract-all --date 2022-01-18
+# Extract
+python src/main.py --daily-extract --date 2022-01-18
 
-# 3. Run benchmark
-python src/main.py --benchmark
+# Output
+cat data/output/ivoris_chart_entries_2022-01-18.json
 ```
+
+### Part 1 Success Criteria
+
+- [x] All 5 required fields extracted
+- [x] Insurance status correctly mapped (GKV/PKV/Selbstzahler)
+- [x] Service codes linked to chart entries
+- [x] CSV output with proper headers
+- [x] JSON output with structured format
+
+---
+
+## Part 2: Multi-Center Scale (Extension)
+
+### The Question
+
+> *"The main challenge is complete. But Clinero doesn't manage one dental practice - they manage many. What happens when you need to extract from 30 centers, each with randomly generated table and column names?"*
+
+### The Problem
+
+Each Ivoris installation can have **randomly generated schema names**:
+
+| Center | Table Name | Column Names |
+|--------|------------|--------------|
+| Munich | `KARTEI_MN` | `PATNR_NAN6`, `DATUM_3A4` |
+| Berlin | `KARTEI_8Y` | `PATNR_DZ`, `DATUM_QW2` |
+| Hamburg | `KARTEI_XQ4` | `PATNR_R2Z5`, `DATUM_7M` |
+| ... | ... | ... |
+
+**Same logical data, different physical names. You can't write one SQL query that works everywhere.**
+
+### Extension Requirements
+
+1. **Schema Auto-Discovery**
+   - Query `INFORMATION_SCHEMA` to discover actual table/column names
+   - Pattern matching to identify canonical entities
+   - No hardcoded mappings
+
+2. **Human Review Workflow**
+   - Generate proposed mappings with `reviewed: false` flag
+   - Production safety: human verifies before extraction
+
+3. **Parallel Extraction**
+   - ThreadPoolExecutor for concurrent database access
+   - Target: <5 seconds for 30 centers
+
+4. **Unified Output**
+   - Same 5 fields as Part 1 + center_id, center_name
+   - CSV and JSON formats
+
+### Solution Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Multi-Center Pipeline                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐      ┌──────────┐│
+│  │ Center 1 │  │ Center 2 │  │ Center 3 │ ...  │Center 30 ││
+│  │ _MN      │  │ _8Y      │  │ _XQ4     │      │ _LA      ││
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘      └────┬─────┘│
+│       │             │             │                  │      │
+│       ▼             ▼             ▼                  ▼      │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │           Schema Discovery (INFORMATION_SCHEMA)       │  │
+│  │              ↓                                        │  │
+│  │           Pattern Matching (KARTEI_XX → KARTEI)       │  │
+│  │              ↓                                        │  │
+│  │           Mapping Files (reviewed: false)             │  │
+│  │              ↓                                        │  │
+│  │           Human Review (reviewed: true)               │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                              │                              │
+│                              ▼                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Parallel Extraction                      │  │
+│  │              ThreadPoolExecutor                       │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                              │                              │
+│                              ▼                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Unified Output                           │  │
+│  │   center_id | date | patient_id | insurance | entry   │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Part 2 Commands
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+
+# Discover schema chaos
+python -m src.cli discover-raw -c center_01
+
+# View mapping
+python -m src.cli show-mapping center_01
+
+# Extract
+python -m src.cli extract --date 2022-01-18
+
+# Benchmark (the proof)
+python -m src.cli benchmark
+```
+
+### Part 2 Success Criteria
+
+- [x] 30 centers with random schemas
+- [x] Pattern-based discovery works for all
+- [x] Human review workflow (`reviewed` flag)
+- [x] <500ms for 30 centers (target was <5s)
+- [x] Web UI for exploration
+
+---
+
+## Database Architecture
+
+| Container | Port | Project | Databases |
+|-----------|------|---------|-----------|
+| `ivoris-sqlserver` | 1433 | ivoris-pipeline | 1 (`DentalDB`) |
+| `ivoris-multi-sqlserver` | 1434 | ivoris-multi-center | 30 (`DentalDB_01`-`DentalDB_30`) |
+
+---
+
+## Results Summary
+
+| Metric | Part 1 | Part 2 |
+|--------|--------|--------|
+| **Databases** | 1 | 30 |
+| **Schema Type** | Standard | Random per center |
+| **Output Fields** | 5 | 5 + center info |
+| **Extraction Time** | ~50ms | ~466ms |
+| **Status** | ✅ Complete | ✅ Complete |
+
+---
+
+## The Narrative
+
+> "I was asked to build a daily extraction pipeline for Ivoris dental software. I built that.
+>
+> Then I asked myself: what happens at scale? What if there are 30 centers, each with randomly generated schema names?
+>
+> I built that too."
