@@ -1,5 +1,12 @@
 # Ivoris Multi-Center Extraction Pipeline
 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![SQL Server 2019](https://img.shields.io/badge/SQL%20Server-2019-red.svg)](https://www.microsoft.com/sql-server)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Centers](https://img.shields.io/badge/centers-30-green.svg)](#centers)
+[![Benchmark](https://img.shields.io/badge/benchmark-466ms-brightgreen.svg)](#performance)
+
 **Supplemental Challenge** | Clinero Interview | Jean-Francois Desjardins
 
 ---
@@ -201,6 +208,56 @@ Then open http://localhost:8000 in your browser.
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Data Flow (Mermaid)
+
+```mermaid
+flowchart LR
+    subgraph Sources ["30 Dental Centers"]
+        DB1[(DentalDB_01<br/>KARTEI_MN)]
+        DB2[(DentalDB_02<br/>KARTEI_8Y)]
+        DB3[(DentalDB_...<br/>KARTEI_XQ4)]
+    end
+
+    subgraph Discovery ["Schema Discovery"]
+        IS[INFORMATION_SCHEMA]
+        PM[Pattern Matching]
+        MF[Mapping Files<br/>reviewed: false]
+    end
+
+    subgraph Extraction ["Parallel Extraction"]
+        TP[ThreadPoolExecutor]
+        A1[Adapter 1]
+        A2[Adapter 2]
+        AN[Adapter N]
+    end
+
+    subgraph Output ["Unified Output"]
+        JSON[JSON Export]
+        CSV[CSV Export]
+        WEB[Web UI]
+    end
+
+    DB1 & DB2 & DB3 --> IS
+    IS --> PM
+    PM --> MF
+    MF --> TP
+    TP --> A1 & A2 & AN
+    A1 & A2 & AN --> JSON & CSV & WEB
+```
+
+---
+
+## Performance
+
+| Metric | Target | Actual |
+|--------|--------|--------|
+| **Centers** | 10 | 30 |
+| **Extraction Time** | <5,000ms | **466ms** |
+| **Per-Center Average** | 500ms | **15ms** |
+| **Parallel Workers** | - | 5 |
+
+> **10x faster than target** with 3x more centers
 
 ---
 
