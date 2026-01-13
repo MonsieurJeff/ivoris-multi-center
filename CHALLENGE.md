@@ -1,6 +1,30 @@
 # Ivoris Multi-Center Extraction Pipeline
 
-**Supplemental Challenge** | Clinero Interview | Jean-Francois Desjardins
+**Extension Challenge** | Clinero Interview | Jean-Francois Desjardins
+
+---
+
+## Relationship to Main Challenge
+
+This project extends the **[ivoris-pipeline](../ivoris-pipeline)** main challenge:
+
+| Aspect | Main Challenge | This Extension |
+|--------|----------------|----------------|
+| **Scope** | 1 database | 30 databases |
+| **Schema** | Standard names | Random names per center |
+| **Discovery** | Static | Pattern-based introspection |
+| **Output** | Same 5 fields | Same 5 fields + center_id |
+
+### Main Challenge Requirements (Solved in ivoris-pipeline)
+
+> **Extraction-Pipeline für Ivoris bauen**
+>
+> Datenbedarf: Datum, Pat-ID, Versicherungsstatus, Karteikarteneintrag, Leistungen (Ziffern)
+> Output: csv/json
+
+### Extension Question
+
+*"What happens at scale? What if there are 30 centers, each with different schema names?"*
 
 ---
 
@@ -8,14 +32,15 @@
 
 > **Multi-Center Schema Mapping & Extraction**
 >
-> A dental group operates 10 centers, each with their own Ivoris database.
+> A dental group operates 30 centers across Germany, Austria, and Switzerland.
 > While the data structure is logically identical, each center's database
-> has different table and column names due to legacy migrations.
+> has randomly generated table and column names.
 >
 > Build a unified extraction pipeline that:
-> 1. Maps each center's unique schema to a canonical model
-> 2. Extracts daily chart entries from all 10 centers
-> 3. Outputs unified data regardless of source schema
+> 1. Discovers each center's unique schema via pattern matching
+> 2. Maps discovered schemas to a canonical model
+> 3. Extracts daily chart entries from all 30 centers in parallel
+> 4. Outputs unified data regardless of source schema
 
 ---
 

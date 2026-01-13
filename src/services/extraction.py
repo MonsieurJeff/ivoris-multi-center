@@ -149,7 +149,7 @@ class ExtractionService:
         """Export extraction result to JSON."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"multi_extract_{result.target_date.isoformat()}.json"
+        filename = f"ivoris_multi_center_{result.target_date.isoformat()}.json"
         path = self.output_dir / filename
 
         data = {
@@ -179,7 +179,7 @@ class ExtractionService:
         """Export extraction result to CSV."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"multi_extract_{result.target_date.isoformat()}.csv"
+        filename = f"ivoris_multi_center_{result.target_date.isoformat()}.csv"
         path = self.output_dir / filename
 
         entries = result.all_entries

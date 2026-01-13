@@ -1,6 +1,17 @@
 # Acceptance Criteria
 
-**Ivoris Multi-Center Extraction Pipeline**
+**Ivoris Multi-Center Extraction Pipeline** (Extension Challenge)
+
+---
+
+## Context: Two-Part Challenge
+
+This acceptance criteria covers the **extension challenge**. The main challenge acceptance criteria is in [ivoris-pipeline/ACCEPTANCE.md](../ivoris-pipeline/ACCEPTANCE.md).
+
+| Challenge | Output Fields | Acceptance Status |
+|-----------|---------------|-------------------|
+| **Main (ivoris-pipeline)** | date, patient_id, insurance_status, chart_entry, service_codes | ✅ All scenarios pass |
+| **Extension (this)** | Same fields + center_id, center_name | ✅ All scenarios pass |
 
 ---
 

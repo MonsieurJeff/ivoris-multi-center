@@ -63,8 +63,8 @@ python src/main.py --daily-extract --format csv       # CSV output
 python src/main.py --daily-extract --format json      # JSON output
 
 # View output
-cat data/output/daily_extract_2022-01-18.json
-cat data/output/daily_extract_2022-01-18.csv
+cat data/output/ivoris_chart_entries_2022-01-18.json
+cat data/output/ivoris_chart_entries_2022-01-18.csv
 ```
 
 ### ivoris-pipeline Output Format

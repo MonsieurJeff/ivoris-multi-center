@@ -162,7 +162,7 @@ python src/main.py --test-connection
 python src/main.py --daily-extract --date 2022-01-18
 
 # Show output
-cat data/output/daily_extract_2022-01-18.json
+cat data/output/ivoris_chart_entries_2022-01-18.json
 ```
 
 ### Commands - ivoris-multi-center

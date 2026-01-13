@@ -151,7 +151,7 @@ cd ~/Projects/outre_base/sandbox/ivoris-pipeline
 
 python src/main.py --daily-extract --date 2022-01-18
 
-cat data/output/daily_extract_2022-01-18.json
+cat data/output/ivoris_chart_entries_2022-01-18.json
 ```
 
 ### Acts 4-5: Multi-Center

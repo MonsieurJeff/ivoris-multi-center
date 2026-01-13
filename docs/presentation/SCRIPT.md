@@ -78,7 +78,7 @@ python src/main.py --daily-extract --date 2022-01-18
 ### 3.3 Show Output
 
 ```bash
-cat data/output/daily_extract_2022-01-18.json
+cat data/output/ivoris_chart_entries_2022-01-18.json
 ```
 
 **Say:**

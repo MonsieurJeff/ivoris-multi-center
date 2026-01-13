@@ -7,7 +7,20 @@
 [![Centers](https://img.shields.io/badge/centers-30-green.svg)](#centers)
 [![Benchmark](https://img.shields.io/badge/benchmark-466ms-brightgreen.svg)](#performance)
 
-**Supplemental Challenge** | Clinero Interview | Jean-Francois Desjardins
+**Extension Challenge** | Clinero Interview | Jean-Francois Desjardins
+
+---
+
+## Two-Part Challenge
+
+This project extends the **[ivoris-pipeline](../ivoris-pipeline)** main challenge:
+
+| Part | Project | Description |
+|------|---------|-------------|
+| **Main Challenge** | [ivoris-pipeline](../ivoris-pipeline) | Daily extraction from ONE database with standard schema |
+| **Extension** | ivoris-multi-center (this) | Extraction from 30 databases with random schemas |
+
+**The Question:** *"What if there were 30 centers, each with randomly generated table and column names?"*
 
 ---
 
@@ -312,8 +325,14 @@ ivoris-multi-center/
 
 ## Documentation
 
-- [CHALLENGE.md](./CHALLENGE.md) - Full challenge requirements
+### This Project (Extension)
+- [CHALLENGE.md](./CHALLENGE.md) - Extension challenge requirements
 - [ACCEPTANCE.md](./ACCEPTANCE.md) - Acceptance criteria (Gherkin)
+- [BRIEFING.md](./BRIEFING.md) - Unified presentation prep (both projects)
+
+### Main Challenge
+- [ivoris-pipeline](../ivoris-pipeline) - Main challenge project
+- [ivoris-pipeline/CHALLENGE.md](../ivoris-pipeline/CHALLENGE.md) - Original requirements
 
 ---
 
