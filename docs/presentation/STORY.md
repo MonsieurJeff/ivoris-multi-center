@@ -1,125 +1,231 @@
 # The Story
 
-**Narrative Arc for Presentation**
+**Unified 5-Act Narrative: "The Challenge and Beyond"**
 
-This document helps you tell a compelling story, not just show a demo.
-
----
-
-## The Three-Act Structure
-
-```
-ACT 1: THE PROBLEM          →  "Here's the chaos"
-ACT 2: THE SOLUTION         →  "Here's how I tamed it"
-ACT 3: THE PROOF            →  "Here's the evidence it works"
-```
+This document helps you tell a compelling story that covers both projects.
 
 ---
 
-## Act 1: The Problem (Setup)
+## The Five-Act Structure
 
-### The Hook (First 10 seconds)
+```
+ACT 1: THE ASK           →  "Here's what they asked for"
+ACT 2: THE SOLUTION      →  "Here's what I built"
+ACT 3: THE QUESTION      →  "But what about scale?"
+ACT 4: THE EXTENSION     →  "Here's how I went further"
+ACT 5: THE PROOF         →  "Here's the evidence it all works"
+```
 
-Start with the **pain point**, not the solution:
+---
 
-> "Imagine you need to extract patient data from 30 dental clinics. Same software, same data structure - should be easy, right? Except... every single database has different table and column names."
+## Act 1: The Ask (Setup)
 
-### The Villain: Chaos
+**Project:** ivoris-pipeline
 
-The "villain" of your story is **schema chaos**:
+### The Hook (First 15 seconds)
 
-| What They Expect | What They Got |
-|------------------|---------------|
-| `KARTEI` | `KARTEI_MN`, `KARTEI_8Y`, `KARTEI_XQ4`... |
-| `PATNR` | `PATNR_NAN6`, `PATNR_DZ`, `PATNR_R2Z5`... |
-| One query fits all | 30 different queries needed |
+Start with the original requirement:
+
+> "I was asked to build a daily extraction pipeline for Ivoris dental software. Let me show you the original requirement..."
+
+### Show the Requirement
+
+Display the German text (from CHALLENGE.md):
+
+> **"Extraction-Pipeline für Ivoris bauen"**
+>
+> Anforderung: Wenn User einen Karteikarteneintrag machen, soll täglich ein Update/Datenübertrag vorgenommen werden.
+>
+> Datenbedarf: Datum, Pat-ID, Versicherungsstatus, Karteikarteneintrag, Leistungen (Ziffern)
+>
+> Output: csv/json
+
+### Translate for Clarity
+
+> "Build an extraction pipeline for Ivoris. When users make chart entries, transfer the data daily. Five fields needed: Date, Patient ID, Insurance Status, Chart Entry, and Service Codes. Output in CSV or JSON."
 
 ### Why This Matters
 
-Connect to real stakes:
+> "This is the core of any dental practice management integration - getting patient data out of Ivoris in a clean, automated way."
 
-> "In the real world, this happens when dental practices migrate software, merge with other practices, or just have... creative IT departments. You can't ask 30 clinics to rename their databases. You have to adapt."
+---
+
+## Act 2: The Solution (The Main Challenge)
+
+**Project:** ivoris-pipeline
+
+### Show the Implementation
+
+> "So I built it. Docker container for SQL Server, Python extraction service, clean data model."
+
+**Demo commands:**
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+# Show it works
+python src/main.py --daily-extract --date 2022-01-18
+
+# Show the output
+cat data/output/daily_extract_2022-01-18.json
+```
+
+### Walk Through the Output
+
+Point out:
+- All 5 required fields present
+- Insurance status correctly mapped (GKV/PKV/Selbstzahler)
+- Service codes linked to entries
+- Clean JSON structure with metadata
+
+### The Architecture (Brief)
+
+> "The architecture is straightforward: database adapter, extraction service, data model. Nothing fancy - just clean, testable code."
+
+```
+Ivoris DB → Extraction Service → CSV/JSON Output
+```
+
+### The Result
+
+> "All acceptance criteria met. The main challenge is complete."
+
+**Pause here.** Let this land before the pivot.
+
+---
+
+## Act 3: The Question (The Pivot)
+
+**This is the critical transition moment.**
+
+### Set Up the Scale Problem
+
+> "So the main challenge is done. But then I started thinking..."
+
+> "Clinero doesn't manage one dental practice. They manage many. What happens when you need to extract from 30 centers? 50? 100?"
+
+### Reveal the Real Problem
+
+> "And here's the thing about Ivoris that makes this interesting..."
+
+**Dramatic reveal:**
+
+> "Each Ivoris installation can have **randomly generated** table and column names."
+
+### Show What That Means
+
+| Center | Table Name | Column Names |
+|--------|------------|--------------|
+| Munich | `KARTEI_MN` | `PATNR_NAN6`, `DATUM_3A4` |
+| Berlin | `KARTEI_8Y` | `PATNR_DZ`, `DATUM_QW2` |
+| Hamburg | `KARTEI_XQ4` | `PATNR_R2Z5`, `DATUM_7M` |
+| ... | ... | ... |
+
+> "No two centers have the same schema. You can't write one SQL query that works everywhere."
 
 ### The Stakes
 
-What happens if you fail:
+> "So what do you do? Hardcode 30 different mappings? That doesn't scale. Breaks when schemas change. Error-prone."
 
-- Manual work for each center (doesn't scale)
-- Hardcoded mappings (breaks when schemas change)
-- Errors in patient data (dangerous)
+### The Transition
+
+> "I decided to solve this properly. Let me show you what I built."
 
 ---
 
-## Act 2: The Solution (Confrontation)
+## Act 4: The Extension (The Multi-Center Solution)
 
-### The Hero: Pattern-Based Discovery
+**Project:** ivoris-multi-center
 
-Your solution is the "hero" that conquers the chaos:
+### Show the Chaos
 
-> "Instead of fighting the randomness, I embraced it. The key insight: even random names follow a pattern. `KARTEI_MN` still has `KARTEI` in it. `PATNR_NAN6` still starts with `PATNR`."
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
 
-### The Journey (4 Steps)
+# See what's actually in a database
+python -m src.cli discover-raw -c center_01
+```
 
-Tell it as a sequence:
+> "This is raw schema discovery. See the random suffixes? Every table, every column has its own random characters."
 
-**Step 1: See the Truth**
-> "First, I had to see what's actually there. Raw discovery - query the database's `INFORMATION_SCHEMA`, no assumptions, just facts."
+### Explain the Solution
 
-**Step 2: Find the Pattern**
-> "Then, pattern matching. Strip the random suffix, find the canonical name. `KARTEI_XYZ` becomes `KARTEI`."
+> "My solution has four stages:"
 
-**Step 3: Human Checkpoint**
+**Stage 1: Raw Discovery**
+> "Query INFORMATION_SCHEMA to see what actually exists. No assumptions, just facts."
+
+**Stage 2: Pattern Matching**
+> "Find the canonical name within the random name. `KARTEI_MN` → `KARTEI`. Strip the suffix, find the pattern."
+
+**Stage 3: Human Review**
 > "Here's the key architectural decision - I don't trust the pattern matching blindly. Every mapping file has a `reviewed: false` flag. In production, a human verifies before extraction runs."
 
-**Step 4: Scale It**
-> "Finally, parallel execution. All 30 centers at once, using ThreadPoolExecutor. Each center uses its own mapping, outputs to a unified format."
+**Stage 4: Parallel Extraction**
+> "All 30 centers at once using ThreadPoolExecutor. Each uses its own mapping, outputs to unified format."
 
-### The Architectural Choices (Why These Matter)
+### Show the Mapping
 
-| Choice | Why It Matters |
-|--------|----------------|
-| JSON mapping files | Human-readable, git-trackable, debuggable |
-| `reviewed` flag | Production safety - catch mapping errors before they corrupt data |
-| Ground truth separation | Can validate discovery accuracy |
-| Parallel extraction | Scales linearly - 30 centers in <500ms |
+```bash
+python -m src.cli show-mapping center_01
+```
 
-### The Turning Point
+> "See? Canonical names on the left, actual database names on the right. Auto-generated by pattern matching."
 
-> "The moment it clicked: this isn't about solving one extraction. It's about building a system that handles ANY schema variation, for ANY number of centers."
+**Point out the `reviewed: false` flag.**
+
+### Run the Benchmark
+
+```bash
+python -m src.cli benchmark
+```
+
+> "Now let's see if it actually works at scale..."
+
+**Wait for results. Let them sink in.**
+
+> "466 milliseconds for 30 centers. The target was 5 seconds. Ten times faster."
 
 ---
 
-## Act 3: The Proof (Resolution)
+## Act 5: The Proof (Resolution)
 
-### Show, Don't Tell
+### Summarize Both Solutions
 
-This is where the demo does the talking:
+| Challenge | Solution | Result |
+|-----------|----------|--------|
+| **Main:** Daily extraction | ivoris-pipeline | All 5 fields, CSV/JSON |
+| **Extension:** 30 random schemas | ivoris-multi-center | 466ms, pattern-based |
 
-| Claim | Proof |
-|-------|-------|
-| "Handles random schemas" | `discover-raw` shows chaos, `show-mapping` shows order |
-| "Works for all 30" | `benchmark` runs all 30 successfully |
-| "Fast enough" | <500ms vs 5000ms target |
-| "Human-verifiable" | Web UI shows mappings, Schema Diff validates |
+### The Key Architectural Decisions
+
+> "A few decisions that matter for production:"
+
+1. **JSON mapping files** - Human-readable, git-trackable, debuggable
+2. **`reviewed` flag** - Catch mapping errors before they corrupt data
+3. **Pattern-based discovery** - Handles any schema variation
+4. **Zero code changes to add centers** - Just configuration
 
 ### The Numbers
 
-End with concrete results:
-
 ```
-30 dental centers
-30 unique schemas
-<500ms total extraction
-100% pattern match accuracy
-0 hardcoded mappings
+Main Challenge:
+  - 5 required fields extracted
+  - All acceptance criteria met
+  - Production-ready in ~3 hours
+
+Extension:
+  - 30 dental centers
+  - 30 unique schemas
+  - <500ms total extraction
+  - 100% pattern match accuracy
+  - 0 hardcoded mappings
 ```
 
 ### The Transformation
 
-Before → After story:
-
-> "Before: 30 different queries, manual mapping, error-prone.
-> After: One command, automatic discovery, verified mappings, unified output."
+> "Before: One hardcoded extraction that doesn't scale."
+>
+> "After: A system that handles any number of centers with any schema variation."
 
 ---
 
@@ -127,15 +233,17 @@ Before → After story:
 
 ### Where to Pause
 
-1. **After showing the chaos** - Let them feel the problem
-2. **After the `reviewed: false` explanation** - This shows you think about production
-3. **After benchmark results** - Let the numbers sink in
+1. **After "The main challenge is complete"** - Let it land before pivoting
+2. **After revealing random schemas** - Let them feel the problem
+3. **After the `reviewed: false` explanation** - Shows production thinking
+4. **After benchmark results** - Let the numbers sink in
 
 ### Where to Add Energy
 
-1. **The hook** - Start with confidence
-2. **The turning point** - Show enthusiasm for the solution
-3. **The results** - Pride in what you built
+1. **The pivot question** - "But what about 30 centers?"
+2. **The reveal** - "Randomly generated table names"
+3. **The solution** - "Pattern-based discovery"
+4. **The results** - "Ten times faster than required"
 
 ### Where to Stay Calm
 
@@ -147,31 +255,31 @@ Before → After story:
 
 ## Key Messages (What They Should Remember)
 
-If they remember only THREE things:
+If they remember only FOUR things:
 
-1. **The problem is real** - Random schemas happen in production
-2. **The solution is systematic** - Pattern-based discovery, not hardcoding
-3. **The safety is built-in** - Human review before extraction
+1. **Main challenge: Complete** - Daily extraction pipeline works
+2. **Extension: Scale** - 30 centers with random schemas
+3. **Solution: Systematic** - Pattern-based discovery, not hardcoding
+4. **Safety: Built-in** - Human review before extraction
 
 ---
 
 ## Transitions
 
-### Problem → Solution
+### Act 1 → Act 2 (Ask → Solution)
+> "So I built it..."
 
-> "So how do you handle this? You don't fight the randomness - you find the pattern within it."
+### Act 2 → Act 3 (Solution → Question)
+> "The main challenge is complete. But then I started thinking..."
 
-### Solution → Demo
+### Act 3 → Act 4 (Question → Extension)
+> "I decided to solve this properly. Let me show you."
 
-> "Let me show you what this looks like in practice..."
+### Act 4 → Act 5 (Extension → Proof)
+> "Let's see if it actually works at scale..."
 
-### Demo → Results
-
-> "Now let's see if it actually works at scale..."
-
-### Results → Wrap Up
-
-> "So there you have it - 30 databases, 30 random schemas, one unified pipeline."
+### Closing
+> "That's both challenges complete. Thank you for watching."
 
 ---
 
@@ -179,27 +287,25 @@ If they remember only THREE things:
 
 If you had to summarize in one sentence:
 
-> "I built a pattern-based schema discovery system that extracts dental patient data from 30 centers with randomly-named tables, using auto-generated mappings with human review checkpoints."
+> "I built the daily extraction pipeline you asked for, then extended it to handle 30 centers with randomly-generated schemas using pattern-based discovery - completing 30 extractions in 466 milliseconds."
 
 ---
 
 ## Anti-Patterns (What to Avoid)
 
 ### Don't:
-
-- Start with "So I built this thing..." (boring)
-- List features without context (no story)
-- Rush through the demo (anxiety shows)
-- Apologize for the code (confidence matters)
-- End with "I guess that's it" (weak close)
+- Jump straight to multi-center (no context)
+- Apologize for the extension ("I know you didn't ask for this...")
+- Rush through the pivot (it's the key moment)
+- List features without the story arc
+- End with "I guess that's it"
 
 ### Do:
-
-- Start with the problem (creates tension)
-- Explain WHY before HOW (motivation)
-- Pause after key moments (let it land)
-- Own your decisions (confidence)
-- End with clear results (strong close)
+- Start with the original ask (grounds the story)
+- Frame the extension as initiative (not scope creep)
+- Make the pivot feel natural ("But then I wondered...")
+- Show genuine enthusiasm for solving the harder problem
+- End with clear, confident results
 
 ---
 
@@ -207,9 +313,9 @@ If you had to summarize in one sentence:
 
 Before recording, answer these out loud:
 
-1. "What's the hardest part of this problem?"
-2. "Why did I choose JSON files over a database?"
-3. "What would break if I removed the `reviewed` flag?"
-4. "What would I do differently with more time?"
+1. "What were the 5 required fields in the original challenge?"
+2. "Why is random schema naming a hard problem?"
+3. "What does the `reviewed` flag do and why does it matter?"
+4. "How long does extraction take for 30 centers?"
 
-Being able to answer these smoothly shows you understand your own system.
+Being able to answer these smoothly shows you understand both systems.

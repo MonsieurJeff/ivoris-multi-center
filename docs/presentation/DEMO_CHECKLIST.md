@@ -1,6 +1,6 @@
 # Demo Checklist
 
-**Pre-Recording Setup for Loom Video**
+**Pre-Recording Setup for Unified Presentation**
 
 ---
 
@@ -17,23 +17,24 @@
 ### Terminal Setup
 
 ```bash
-# Navigate to project
+# Open TWO terminal tabs
+
+# Tab 1: ivoris-pipeline
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+# Tab 2: ivoris-multi-center
 cd ~/Projects/outre_base/sandbox/ivoris-multi-center
 
-# Clear terminal
+# Set font size to 16pt+ in each
+# Clear both terminals
 clear
-
-# Set font size (iTerm2: Cmd+Plus or preferences)
-# Target: 16pt minimum
-
-# Set terminal theme to high contrast
 ```
 
 ### Browser Setup
 
 - [ ] Zoom to 125% (Cmd +)
-- [ ] Open http://localhost:8000 (will start later)
-- [ ] Clear browser history (optional, cleaner URL bar)
+- [ ] Have http://localhost:8000 ready (will start later)
+- [ ] Clear browser history (optional)
 - [ ] Hide bookmarks bar
 
 ---
@@ -44,7 +45,7 @@ clear
 
 ```bash
 # Is SQL Server running?
-docker ps | grep ivoris-multi-sqlserver
+docker ps | grep ivoris
 
 # If not running:
 docker-compose up -d
@@ -56,32 +57,55 @@ sleep 30
 ivoris-multi-sqlserver   running   0.0.0.0:1434->1433/tcp
 ```
 
-### Database Check
+---
+
+### Check Project 1: ivoris-pipeline
 
 ```bash
-# Do databases exist?
-python -m src.cli list | head -10
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+# Test connection
+python src/main.py --test-connection
+
+# Test extraction
+python src/main.py --daily-extract --date 2022-01-18
+
+# Verify output exists
+ls data/output/
 ```
 
-**Expected:** Should show 30 centers with `[mapped]` status
+**Expected:**
+- Connection successful
+- Extraction with entries
+- Output files exist
 
-### Mapping Files Check
+---
+
+### Check Project 2: ivoris-multi-center
 
 ```bash
-# Do mapping files exist?
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+
+# Check centers
+python -m src.cli list | head -5
+
+# Check mappings
 ls data/mappings/ | wc -l
-```
+# Expected: 30
 
-**Expected:** `30` (one per center)
-
-### Quick Smoke Test
-
-```bash
-# Run a fast extraction
+# Quick smoke test
 python -m src.cli extract -c center_01 --date 2022-01-18
+# Should complete in <100ms
 
-# Should complete in <100ms with entries
+# Run benchmark
+python -m src.cli benchmark
+# Should show PASS
 ```
+
+**Expected:**
+- 30 centers with `[mapped]` status
+- 30 mapping files
+- Benchmark passes (<500ms)
 
 ---
 
@@ -89,55 +113,66 @@ python -m src.cli extract -c center_01 --date 2022-01-18
 
 ### Final Terminal State
 
+**Tab 1 (pipeline):**
 ```bash
-# Clear and ready
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
 clear
-
-# Show you're in the right place
 pwd
-# Should show: .../sandbox/ivoris-multi-center
+```
+
+**Tab 2 (multi-center):**
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+clear
+pwd
 ```
 
 ### Loom Setup
 
 - [ ] Select screen area (or full screen)
 - [ ] Enable microphone
-- [ ] Disable webcam (optional - focus on demo)
+- [ ] Disable webcam (optional)
 - [ ] Check audio levels
 
 ### Mental Prep
 
 - Take a breath
-- Review the first line: *"I built a data extraction pipeline..."*
+- Review the pivot line: *"So the main challenge is done. But then I started thinking..."*
 - Remember: you can always re-record
 
 ---
 
 ## Command Sequence (Copy-Paste Ready)
 
-### Section 4: CLI Demo
+### Act 2: Pipeline Solution
 
 ```bash
-# 4.1 List centers
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+python src/main.py --daily-extract --date 2022-01-18
+
+cat data/output/daily_extract_2022-01-18.json
+```
+
+### Acts 4-5: Multi-Center
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+
 python -m src.cli list
 
-# 4.2 Raw discovery
 python -m src.cli discover-raw -c center_01
 
-# 4.3 Show mapping
 python -m src.cli show-mapping center_01
 
-# 4.4 Extract
 python -m src.cli extract --date 2022-01-18 -c center_01
 
-# 4.5 Benchmark
 python -m src.cli benchmark
 ```
 
-### Section 5: Web UI
+### Optional: Web UI
 
 ```bash
-# Start web server
 python -m src.cli web
 ```
 
@@ -147,62 +182,73 @@ Then open: http://localhost:8000
 
 ## Emergency Recovery
 
-### If Docker is down
+### If Pipeline Database Missing
 
 ```bash
-docker-compose up -d
-sleep 30
-# Then continue
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+./scripts/restore-database.sh
 ```
 
-### If databases are missing
+### If Multi-Center Databases Missing
 
 ```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
 python scripts/generate_test_dbs.py
 python -m src.cli generate-mappings
 ```
 
-### If web server won't start
+### If Docker is Down
 
 ```bash
-# Kill any existing uvicorn
-pkill -f uvicorn
+docker-compose up -d
+sleep 30
+```
 
-# Try again
+### If Web Server Won't Start
+
+```bash
+pkill -f uvicorn
 python -m src.cli web
 ```
 
-### If Python imports fail
+### If Python Imports Fail
 
 ```bash
 # Make sure you're in the right directory
-cd ~/Projects/outre_base/sandbox/ivoris-multi-center
-
-# Reinstall dependencies
+# Then reinstall dependencies
 pip install -r requirements.txt
 ```
+
+---
+
+## Quick Verification Checklist
+
+Run this complete check before recording:
+
+```bash
+# 1. Docker
+docker ps | grep ivoris && echo "✓ Docker OK"
+
+# 2. Pipeline
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+python src/main.py --test-connection && echo "✓ Pipeline OK"
+
+# 3. Multi-center
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+python -m src.cli list | head -3 && echo "✓ Multi-center OK"
+
+# 4. Benchmark
+python -m src.cli benchmark | tail -3
+```
+
+**All should show OK/PASS**
 
 ---
 
 ## Post-Recording
 
 - [ ] Watch playback (check audio levels)
+- [ ] Verify the pivot moment is clear
 - [ ] Note any retake sections
 - [ ] Export/upload to Loom
 - [ ] Copy share link
-
----
-
-## Quick Reference Card
-
-| What | Command |
-|------|---------|
-| Start Docker | `docker-compose up -d` |
-| Check Docker | `docker ps \| grep ivoris` |
-| List centers | `python -m src.cli list` |
-| Discover | `python -m src.cli discover-raw -c center_01` |
-| Show mapping | `python -m src.cli show-mapping center_01` |
-| Extract | `python -m src.cli extract --date 2022-01-18` |
-| Benchmark | `python -m src.cli benchmark` |
-| Web UI | `python -m src.cli web` |
-| Kill web | `pkill -f uvicorn` |

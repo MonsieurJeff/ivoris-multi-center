@@ -1,8 +1,96 @@
 # Quick Reference
 
-**Developer Reference for Ivoris Multi-Center Pipeline**
+**Developer Reference for Both Ivoris Projects**
 
-> **Full Version:** See [docs/presentation/QUICK_REFERENCE.md](docs/presentation/QUICK_REFERENCE.md) for the complete reference with Python examples, SQL queries, and API documentation.
+> **Unified Presentation:** This reference covers both `ivoris-pipeline` (main challenge) and `ivoris-multi-center` (extension).
+
+---
+
+## The Two Projects
+
+| Project | Type | Location | Purpose |
+|---------|------|----------|---------|
+| **ivoris-pipeline** | Main Challenge | `sandbox/ivoris-pipeline` | Daily extraction from ONE database |
+| **ivoris-multi-center** | Extension | `sandbox/ivoris-multi-center` | 30 databases with random schemas |
+
+---
+
+## ivoris-pipeline Commands
+
+**Location:** `~/Projects/outre_base/sandbox/ivoris-pipeline`
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+# Setup (from scratch)
+docker-compose up -d && sleep 30    # Start SQL Server
+./scripts/restore-database.sh       # Restore DentalDB from backup
+pip install -r requirements.txt     # Install dependencies
+
+# Daily usage
+python src/main.py --test-connection           # Test DB connection
+python src/main.py --daily-extract             # Extract yesterday's data
+python src/main.py --daily-extract --date 2022-01-18  # Specific date
+python src/main.py --daily-extract --format csv       # CSV output
+python src/main.py --daily-extract --format json      # JSON output
+
+# View output
+cat data/output/daily_extract_2022-01-18.json
+cat data/output/daily_extract_2022-01-18.csv
+```
+
+### ivoris-pipeline Output Format
+
+```json
+{
+  "extraction_timestamp": "2026-01-13T06:00:00",
+  "target_date": "2022-01-18",
+  "record_count": 4,
+  "entries": [
+    {
+      "date": "2022-01-18",
+      "patient_id": 1,
+      "insurance_status": "GKV",
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Kontrolle, Befund unauffällig",
+      "service_codes": ["01", "Ä1"]
+    }
+  ]
+}
+```
+
+### Required Fields (Main Challenge)
+
+| Field | German | Source |
+|-------|--------|--------|
+| date | Datum | KARTEI.DATUM |
+| patient_id | Pat-ID | KARTEI.PATNR |
+| insurance_status | Versicherungsstatus | KASSEN.ART |
+| chart_entry | Karteikarteneintrag | KARTEI.BEMERKUNG |
+| service_codes | Leistungen | LEISTUNG.LEISTUNG |
+
+---
+
+## ivoris-multi-center Commands
+
+**Location:** `~/Projects/outre_base/sandbox/ivoris-multi-center`
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+
+# Setup (from scratch)
+docker-compose up -d && sleep 30         # Start SQL Server
+python scripts/generate_test_dbs.py      # Generate 30 random-schema databases
+pip install -r requirements.txt          # Install dependencies
+python -m src.cli generate-mappings      # Create mapping files
+
+# Daily usage
+python -m src.cli list                   # Show all 30 centers
+python -m src.cli benchmark              # Performance test (target: <5s)
+python -m src.cli web                    # Start web UI
+```
+
+> **Full multi-center reference continues below...**
 
 ---
 
@@ -416,13 +504,29 @@ ivoris-multi-center/
 
 ## The Story (For Presentation)
 
-### Act 1: The Problem
+> **See Also:** [docs/presentation/STORY.md](docs/presentation/STORY.md) for the full 5-act unified narrative.
+
+### The Unified Narrative
+
+| Act | Project | Key Message |
+|-----|---------|-------------|
+| **Act 1: The Ask** | pipeline | Original German requirement, 5 fields |
+| **Act 2: The Solution** | pipeline | Clean extraction, CSV/JSON output |
+| **Act 3: The Pivot** | - | "But what about 30 centers with random schemas?" |
+| **Act 4: The Extension** | multi-center | Pattern-based discovery, parallel extraction |
+| **Act 5: The Proof** | multi-center | 466ms for 30 centers, 10x faster than target |
+
+### The Pivot Line (Memorize This!)
+
+> "So the main challenge is done. But then I started thinking... Clinero doesn't manage one dental practice. They manage many. And here's the thing about Ivoris: each installation can have **randomly generated** table and column names. Let me show you."
+
+### Act 4 Detail: The Multi-Center Problem
 
 > "30 dental centers across Germany, Austria, and Switzerland. Same software, but each has a **randomly generated schema**. Tables like `KARTEI_MN`, `KARTEI_8Y` - every center different. Columns too: `PATNR_NAN6`, `PATNR_DZ`. No pattern across centers."
 
 **Key point**: Can't write static SQL. Need dynamic schema discovery.
 
-### Act 2: The Solution Architecture
+### Act 4 Detail: The Solution Architecture
 
 ```
 Raw Discovery → Mapping Files → Parallel Extraction → Unified Output

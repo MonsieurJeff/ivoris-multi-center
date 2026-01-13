@@ -1,239 +1,249 @@
-# Presentation Script
+# Unified Presentation Script
 
-**Ivoris Multi-Center Pipeline** | Loom Recording | 5-7 minutes
+**Ivoris Pipeline + Multi-Center** | Loom Recording | ~7 minutes
 
 ---
 
 ## Overview
 
-| Section | Duration | What to Show |
-|---------|----------|--------------|
-| 1. Hook | 15 sec | Title slide or README |
-| 2. Problem | 30 sec | Schema examples |
-| 3. Architecture | 1 min | Diagram or terminal |
-| 4. CLI Demo | 2 min | Terminal commands |
-| 5. Web UI Demo | 2 min | Browser |
-| 6. Results | 30 sec | Benchmark output |
-| 7. Wrap Up | 15 sec | Summary |
+| Section | Duration | Project | What to Show |
+|---------|----------|---------|--------------|
+| 1. Opening | 15 sec | - | Hook with both challenges |
+| 2. The Ask | 30 sec | pipeline | German requirement |
+| 3. The Solution | 1.5 min | pipeline | Extract + show output |
+| 4. The Pivot | 30 sec | - | "But what about 30 centers?" |
+| 5. The Chaos | 1 min | multi-center | discover-raw |
+| 6. The Extension | 1.5 min | multi-center | Mapping + extraction |
+| 7. The Proof | 1 min | multi-center | Benchmark |
+| 8. Wrap Up | 30 sec | - | Summary |
 
-**Total: ~6.5 minutes**
-
----
-
-## Section 1: Hook (15 seconds)
-
-**Show:** Project title or README header
-
-**Say:**
-> "I built a data extraction pipeline that handles 30 dental databases - each with completely random table and column names. Let me show you how it works."
-
-**Transition:** Open terminal
+**Total: ~7 minutes**
 
 ---
 
-## Section 2: Problem Statement (30 seconds)
+## Section 1: Opening (15 seconds)
 
-**Show:** Terminal with `discover-raw` output or slide
+**Show:** Terminal or title slide
 
 **Say:**
-> "Here's the challenge: 30 dental centers across Germany, Austria, and Switzerland. Each center runs the same Ivoris software, but every database has randomly generated schema names."
+> "I was asked to build a daily extraction pipeline for Ivoris dental software. I built that. Then I asked myself: what happens at scale? What if there are 30 centers, each with completely different schema names? Let me show you both solutions."
 
-**Run:**
+**Transition:** Navigate to ivoris-pipeline
+
+---
+
+## Section 2: The Ask (30 seconds)
+
+**Project:** ivoris-pipeline
+
+**Show:** CHALLENGE.md or README
+
+**Say:**
+> "Here's the original requirement, in German..."
+
+**Read/Show:**
+> "Extraction-Pipeline für Ivoris bauen. Datenbedarf: Datum, Pat-ID, Versicherungsstatus, Karteikarteneintrag, Leistungen."
+
+**Say:**
+> "Build an extraction pipeline. When users make chart entries, transfer the data daily. Five required fields: Date, Patient ID, Insurance Status, Chart Entry, and Service Codes. Output in CSV or JSON."
+
+**Key points:**
+- Show the German text (authenticity)
+- Translate briefly
+- Emphasize the 5 required fields
+
+---
+
+## Section 3: The Solution (1.5 minutes)
+
+**Project:** ivoris-pipeline
+
+**Show:** Terminal
+
+### 3.1 Navigate to Project
+
 ```bash
-python -m src.cli discover-raw -c center_01 | head -20
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+```
+
+### 3.2 Run Extraction
+
+```bash
+python src/main.py --daily-extract --date 2022-01-18
 ```
 
 **Say:**
-> "See? Tables like `KARTEI_MN` instead of just `KARTEI`. And every column has its own random suffix too - `PATNR_NAN6`, `DATUM_3A4`. No pattern across centers. You can't write static SQL."
+> "One command. Extract yesterday's chart entries - or any specific date."
 
-**Key points to hit:**
-- 30 centers, each unique
-- Random table suffixes (2-4 chars)
-- Random column suffixes (independent of table)
-- Same logical data, different physical names
+### 3.3 Show Output
+
+```bash
+cat data/output/daily_extract_2022-01-18.json
+```
+
+**Say:**
+> "Clean JSON output. All five required fields: date, patient_id, insurance_status, chart_entry, service_codes."
+
+**Point out:**
+- Metadata section (timestamp, record count)
+- Insurance status mapping (GKV = public, PKV = private)
+- German characters handled correctly (UTF-8)
+
+### 3.4 The Result
+
+**Say:**
+> "All acceptance criteria met. Clean architecture - database adapter, extraction service, data model. The main challenge is complete."
+
+**PAUSE.** Let this land.
 
 ---
 
-## Section 3: Architecture (1 minute)
+## Section 4: The Pivot (30 seconds)
 
-**Show:** Terminal or draw as you explain
+**This is the critical moment.**
+
+**Say (with energy):**
+> "So the main challenge is done. But then I started thinking..."
+>
+> "Clinero doesn't manage one dental practice. They manage many. What happens when you need to extract from 30 centers?"
+
+**Build tension:**
+> "And here's the thing about Ivoris that makes this interesting: each installation can have **randomly generated** table and column names."
 
 **Say:**
-> "My solution has four stages..."
+> "KARTEI_MN in Munich. KARTEI_8Y in Berlin. KARTEI_XQ4 in Hamburg. No two centers have the same schema."
 
-**Draw/explain:**
-```
-30 Databases → Raw Discovery → Mapping Files → Parallel Extraction → Unified Output
-```
-
-**Say:**
-> "First, **raw discovery** - I query `INFORMATION_SCHEMA` to see what tables and columns actually exist. No interpretation, just facts."
-
-> "Second, **mapping generation** - pattern matching to figure out that `KARTEI_MN` means `KARTEI`, and `PATNR_NAN6` means `PATNR`. This creates JSON mapping files."
-
-> "Third, the key part - **manual review workflow**. Every mapping file has a `reviewed: false` flag. In production, a human would verify the mapping before extraction. Safety first."
-
-> "Finally, **parallel extraction** using ThreadPoolExecutor. All 30 centers at once, unified into a single canonical format."
-
-**Key architectural decisions to mention:**
-- JSON mapping files (human-readable, version-controllable)
-- `reviewed` flag (production safety)
-- Ground truth separation (validation)
-- Pattern-based, not hardcoded
+**Transition:**
+> "I decided to solve this properly. Let me show you."
 
 ---
 
-## Section 4: CLI Demo (2 minutes)
+## Section 5: The Chaos (1 minute)
 
-**Show:** Terminal (large font, 16pt+)
+**Project:** ivoris-multi-center
 
-### 4.1 List Centers
+**Show:** Terminal
+
+### 5.1 Navigate to Project
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+```
+
+### 5.2 List Centers
 
 ```bash
 python -m src.cli list
 ```
 
 **Say:**
-> "30 centers configured - 20 in Germany, 5 in Austria, 5 in Switzerland. Each with its own database."
+> "30 centers configured. 20 in Germany, 5 in Austria, 5 in Switzerland. Each with its own database and unique schema."
 
-### 4.2 Raw Discovery
+### 5.3 Show Raw Discovery
 
 ```bash
 python -m src.cli discover-raw -c center_01
 ```
 
 **Say:**
-> "Raw discovery shows exactly what's in the database. See the random suffixes? `KARTEI_MN`, `PATNR_NAN6`. Every center is different."
+> "Raw schema discovery. See the random suffixes? KARTEI_MN, PATNR_NAN6, DATUM_3A4. Every table, every column has random characters appended."
 
-### 4.3 Show Mapping
+**Let them absorb the chaos.**
+
+> "You can't write one SQL query that works everywhere. Every center needs different column names."
+
+---
+
+## Section 6: The Extension (1.5 minutes)
+
+**Project:** ivoris-multi-center
+
+### 6.1 Explain the Solution
+
+**Say:**
+> "My solution: pattern-based discovery. Four stages."
+
+**Briefly explain:**
+> "First, raw discovery - see what's there. Second, pattern matching - strip the random suffix, find the canonical name. Third, human review - every mapping has a 'reviewed: false' flag. In production, a human verifies before extraction. Fourth, parallel execution - all 30 centers at once."
+
+### 6.2 Show Mapping
 
 ```bash
 python -m src.cli show-mapping center_01
 ```
 
 **Say:**
-> "The mapping file shows canonical to actual. `KARTEI` maps to `KARTEI_MN`. `PATNR` maps to `PATNR_NAN6`. This was auto-generated by pattern matching."
+> "Here's what the mapping looks like. Canonical names on the left, actual database names on the right. Auto-generated by pattern matching."
 
 **Point out:**
 - `reviewed: false` flag
-- Table mappings
-- Column mappings
+- Table mappings (KARTEI → KARTEI_MN)
+- Column mappings (PATNR → PATNR_NAN6)
 
-### 4.4 Extract Data
+**Say:**
+> "The key insight: even random names follow a pattern. KARTEI_MN still has KARTEI in it."
+
+### 6.3 Extract from One Center
 
 ```bash
 python -m src.cli extract --date 2022-01-18 -c center_01
 ```
 
 **Say:**
-> "Extraction uses the mapping to build the right SQL. Output is in canonical format - same structure regardless of which center."
+> "Same unified output format, regardless of which center."
 
-### 4.5 Benchmark
+---
+
+## Section 7: The Proof (1 minute)
+
+**Project:** ivoris-multi-center
+
+### 7.1 Run Benchmark
 
 ```bash
 python -m src.cli benchmark
 ```
 
 **Say:**
-> "The benchmark runs all 30 centers in parallel. Target was under 5 seconds... and we're at about 400 milliseconds. Ten times faster than required."
+> "Now the real test. All 30 centers in parallel."
 
-**Wait for output, then point out:**
+**Wait for results. Let them sink in.**
+
+### 7.2 Highlight Results
+
+**Say:**
+> "466 milliseconds for 30 centers. The target was 5 seconds. Ten times faster than required."
+
+**Point out:**
 - Total time
-- Per-center timing
+- Per-center breakdown
 - PASS indicator
 
----
+### 7.3 (Optional) Show Web UI
 
-## Section 5: Web UI Demo (2 minutes)
-
-**Start server:**
 ```bash
 python -m src.cli web
 ```
 
-**Open:** http://localhost:8000
+> "For visual exploration, there's a web UI. Browse centers, view mappings, run benchmarks."
 
-**Say:**
-> "For the supplemental challenge, I built a web UI. Three main pages..."
-
-### 5.1 Explore Page
-
-**Navigate to:** Explore Centers
-
-**Actions:**
-1. Select a center from dropdown
-2. Show center details
-3. Point out the mapping table
-4. Load data for a date
-
-**Say:**
-> "Explore lets you browse individual centers. Here's the schema mapping - canonical names on the left, actual database names on the right."
-
-### 5.2 Metrics Dashboard
-
-**Navigate to:** Metrics Dashboard
-
-**Actions:**
-1. Click "Select All"
-2. Click "Benchmark"
-3. Wait for results
-4. Point out summary cards
-5. Show chart
-6. Click "Export JSON"
-
-**Say:**
-> "The metrics dashboard lets you benchmark multiple centers. Select all 30, run the benchmark, and you get a full breakdown - total time, entries per center, and a visualization."
-
-### 5.3 Schema Diff
-
-**Navigate to:** Schema Diff
-
-**Actions:**
-1. Select a center
-2. Click "Compare"
-3. Show accuracy percentage
-4. Point out green checkmarks
-
-**Say:**
-> "Schema Diff compares what we discovered against ground truth - what the generator actually created. This validates the pattern matching is working correctly."
-
-### 5.4 Dark Mode (Quick)
-
-**Action:** Toggle dark mode
-
-**Say:**
-> "And yes, dark mode works."
+**Only if time permits - can skip to wrap-up.**
 
 ---
 
-## Section 6: Results Summary (30 seconds)
-
-**Show:** Terminal with benchmark results or summary slide
+## Section 8: Wrap Up (30 seconds)
 
 **Say:**
-> "To summarize what we achieved..."
+> "To summarize..."
 
-**Key metrics:**
-- 30 dental centers
-- Random schemas per center
-- Pattern-based discovery (no manual mapping)
-- Manual review workflow for safety
-- <500ms extraction (target was 5s)
-- Web UI with metrics and validation
+**Main challenge:**
+> "The daily extraction pipeline - all 5 required fields, CSV and JSON output, clean architecture. Done."
 
-**Tech stack:**
-- Python 3.11
-- FastAPI + Jinja2
-- SQL Server (Docker)
-- ThreadPoolExecutor
-- Tailwind CSS, Chart.js
+**Extension:**
+> "The multi-center solution - 30 databases with random schemas, pattern-based discovery, human review workflow, parallel extraction in 466 milliseconds."
 
----
-
-## Section 7: Wrap Up (15 seconds)
-
-**Say:**
-> "That's the Ivoris Multi-Center Pipeline - 30 databases with random schemas, unified through pattern-based discovery and parallel extraction. Thanks for watching, happy to answer any questions."
+**Close with confidence:**
+> "That's both challenges complete. The extraction pipeline you asked for, plus a scalable solution that handles schema chaos. Thank you for watching."
 
 ---
 
@@ -241,51 +251,61 @@ python -m src.cli web
 
 ### Before Recording
 
-- [ ] Docker running: `docker ps | grep ivoris`
-- [ ] Databases exist: `python -m src.cli list`
-- [ ] Mappings exist: `ls data/mappings/`
+- [ ] Both projects working (run pre-flight checks)
 - [ ] Terminal font: 16pt+
-- [ ] Browser zoom: 125%
+- [ ] Know the pivot line by heart
+- [ ] Practice the transition from pipeline → multi-center
 - [ ] Close notifications
-- [ ] Hide dock/taskbar
 
 ### During Recording
 
-- **Pace:** Pause after key points
+- **Pace:** Pause after key moments (pivot, benchmark results)
+- **Energy:** Higher energy at the pivot and results
 - **Cursor:** Move slowly, deliberately
-- **Errors:** If something fails, explain and recover
-- **Energy:** Start strong, stay engaged
+- **Errors:** If something fails, stay calm and explain
 
 ### Terminal Setup
 
+Keep two terminal tabs ready:
+- Tab 1: `cd ~/Projects/outre_base/sandbox/ivoris-pipeline`
+- Tab 2: `cd ~/Projects/outre_base/sandbox/ivoris-multi-center`
+
+---
+
+## Emergency Recovery
+
+### If Pipeline Extraction Fails
+
 ```bash
-# Clean terminal
-clear
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+./scripts/restore-database.sh
+python src/main.py --daily-extract --date 2022-01-18
+```
 
-# Make sure we're in the right directory
-cd sandbox/ivoris-multi-center
+### If Multi-Center Benchmark Fails
 
-# Test one command first
-python -m src.cli list
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+python scripts/generate_test_dbs.py
+python -m src.cli generate-mappings
+python -m src.cli benchmark
+```
+
+### If Docker is Down
+
+```bash
+docker-compose up -d
+sleep 30
+# Then retry
 ```
 
 ---
 
-## Backup Commands
+## Backup Plan
 
-If something goes wrong:
+If something goes catastrophically wrong:
 
-```bash
-# Full reset
-docker-compose down -v
-docker-compose up -d
-sleep 30
-python scripts/generate_test_dbs.py
-python -m src.cli generate-mappings
-
-# Just regenerate mappings
-python -m src.cli generate-mappings
-
-# Kill stuck web server
-pkill -f "uvicorn"
-```
+1. **Acknowledge it calmly:** "Let me show you what this would normally produce..."
+2. **Show the output files:** `cat data/output/...`
+3. **Explain the architecture:** Talk through what should happen
+4. **Keep confidence:** "The code works - happy to debug this live or show you the test results"
