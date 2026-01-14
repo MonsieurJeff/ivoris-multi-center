@@ -93,12 +93,34 @@
         <!-- Data View -->
         <div id="data-view" class="hidden">
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
-                        Chart Entries
-                        <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2" id="data-date">(2022-01-18)</span>
-                    </h3>
-                    <span class="text-sm text-slate-500 dark:text-slate-400" id="data-count">0 entries</span>
+                <!-- Header with title and export buttons -->
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+                            Chart Entries
+                            <span class="text-sm font-normal text-slate-500 dark:text-slate-400 ml-2" id="data-date">(2022-01-18)</span>
+                        </h3>
+                        <span class="text-sm text-slate-500 dark:text-slate-400" id="data-count">0 entries</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="clear-filters-btn" class="hidden px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                            Clear Filters
+                        </button>
+                        <div class="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600">
+                            <button id="export-csv-btn" class="px-3 py-1.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors" title="Export filtered data as CSV">
+                                <span class="flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    CSV
+                                </span>
+                            </button>
+                            <button id="export-json-btn" class="px-3 py-1.5 text-sm font-medium bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 border-l border-slate-300 dark:border-slate-600 transition-colors" title="Export filtered data as JSON">
+                                <span class="flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    JSON
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="data-loading" class="hidden py-8 text-center">
@@ -119,14 +141,43 @@
                     <p class="text-slate-500 dark:text-slate-400">No entries found for this date</p>
                 </div>
 
+                <div id="data-no-results" class="hidden py-8 text-center">
+                    <p class="text-slate-500 dark:text-slate-400">No entries match your filters</p>
+                    <button id="clear-filters-link" class="mt-2 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">Clear all filters</button>
+                </div>
+
                 <div class="overflow-x-auto" id="data-table-container">
                     <table class="min-w-full text-sm">
                         <thead>
+                            <!-- Column Headers -->
                             <tr class="border-b border-slate-200 dark:border-slate-700">
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Patient ID</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Date</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Insurance</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600 dark:text-slate-400">Chart Entry</th>
+                            </tr>
+                            <!-- Filter Row -->
+                            <tr class="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                                <th class="py-2 px-4">
+                                    <input type="text" id="filter-patient-id" placeholder="Filter..."
+                                        class="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                        aria-label="Filter by Patient ID">
+                                </th>
+                                <th class="py-2 px-4">
+                                    <input type="text" id="filter-date" placeholder="Filter..."
+                                        class="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                        aria-label="Filter by Date">
+                                </th>
+                                <th class="py-2 px-4">
+                                    <input type="text" id="filter-insurance" placeholder="Filter..."
+                                        class="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                        aria-label="Filter by Insurance">
+                                </th>
+                                <th class="py-2 px-4">
+                                    <input type="text" id="filter-chart-entry" placeholder="Filter..."
+                                        class="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                        aria-label="Filter by Chart Entry">
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="data-table">
@@ -171,10 +222,26 @@
     const viewMappingBtn = document.getElementById('view-mapping');
     const viewDataBtn = document.getElementById('view-data');
 
+    // Filter elements
+    const filterPatientId = document.getElementById('filter-patient-id');
+    const filterDate = document.getElementById('filter-date');
+    const filterInsurance = document.getElementById('filter-insurance');
+    const filterChartEntry = document.getElementById('filter-chart-entry');
+    const clearFiltersBtn = document.getElementById('clear-filters-btn');
+    const clearFiltersLink = document.getElementById('clear-filters-link');
+    const dataNoResults = document.getElementById('data-no-results');
+
+    // Export buttons
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const exportJsonBtn = document.getElementById('export-json-btn');
+
     let currentMapping = null;
     let currentCenterId = null;
     let currentView = 'mapping';
     let dataCache = null;
+    let allEntries = [];
+    let filteredEntries = [];
+    let filterDebounceTimer = null;
 
     // Load centers on page load
     async function loadCenters() {
@@ -327,6 +394,7 @@
         dataLoading.classList.remove('hidden');
         dataError.classList.add('hidden');
         dataEmpty.classList.add('hidden');
+        dataNoResults.classList.add('hidden');
         dataTableContainer.classList.add('hidden');
 
         try {
@@ -357,31 +425,19 @@
                 return;
             }
 
-            const entries = centerData?.entries || [];
+            allEntries = centerData?.entries || [];
 
-            document.getElementById('data-count').textContent = `${entries.length} entries`;
-
-            if (entries.length === 0) {
+            if (allEntries.length === 0) {
+                document.getElementById('data-count').textContent = '0 entries';
                 dataEmpty.classList.remove('hidden');
                 return;
             }
 
-            // Populate data table
-            const tbody = document.getElementById('data-table');
-            tbody.innerHTML = '';
+            // Clear filters when loading new data
+            clearFilters(false);
 
-            for (const entry of entries) {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-slate-100 dark:border-slate-700';
-                row.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-slate-900 dark:text-white">${entry.patient_id || '-'}</td>
-                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.date || '-'}</td>
-                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.insurance_name || entry.insurance_status || '-'}</td>
-                    <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.chart_entry || '-'}</td>
-                `;
-                tbody.appendChild(row);
-            }
-
+            // Apply filters and render
+            applyFilters();
             dataTableContainer.classList.remove('hidden');
         } catch (err) {
             console.error('Failed to load data:', err);
@@ -389,6 +445,145 @@
             document.getElementById('data-error-message').textContent = err.message;
             dataError.classList.remove('hidden');
         }
+    }
+
+    // Apply filters to entries
+    function applyFilters() {
+        const patientIdFilter = filterPatientId.value.toLowerCase().trim();
+        const dateFilter = filterDate.value.toLowerCase().trim();
+        const insuranceFilter = filterInsurance.value.toLowerCase().trim();
+        const chartEntryFilter = filterChartEntry.value.toLowerCase().trim();
+
+        const hasFilters = patientIdFilter || dateFilter || insuranceFilter || chartEntryFilter;
+
+        // Show/hide clear filters button
+        clearFiltersBtn.classList.toggle('hidden', !hasFilters);
+
+        // Filter entries
+        filteredEntries = allEntries.filter(entry => {
+            const patientId = String(entry.patient_id || '').toLowerCase();
+            const date = String(entry.date || '').toLowerCase();
+            const insurance = String(entry.insurance_name || entry.insurance_status || '').toLowerCase();
+            const chartEntry = String(entry.chart_entry || '').toLowerCase();
+
+            return (!patientIdFilter || patientId.includes(patientIdFilter)) &&
+                   (!dateFilter || date.includes(dateFilter)) &&
+                   (!insuranceFilter || insurance.includes(insuranceFilter)) &&
+                   (!chartEntryFilter || chartEntry.includes(chartEntryFilter));
+        });
+
+        // Update count
+        if (hasFilters) {
+            document.getElementById('data-count').textContent = `${filteredEntries.length} of ${allEntries.length} entries`;
+        } else {
+            document.getElementById('data-count').textContent = `${allEntries.length} entries`;
+        }
+
+        // Render filtered results
+        renderTable();
+    }
+
+    // Render table with current filtered entries
+    function renderTable() {
+        const tbody = document.getElementById('data-table');
+        const dataTableContainer = document.getElementById('data-table-container');
+        const dataEmpty = document.getElementById('data-empty');
+
+        tbody.innerHTML = '';
+
+        if (filteredEntries.length === 0 && allEntries.length > 0) {
+            // Has data but filters hide all
+            dataTableContainer.classList.add('hidden');
+            dataNoResults.classList.remove('hidden');
+            dataEmpty.classList.add('hidden');
+            return;
+        }
+
+        dataNoResults.classList.add('hidden');
+
+        for (const entry of filteredEntries) {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+            row.innerHTML = `
+                <td class="py-3 px-4 font-mono text-slate-900 dark:text-white">${entry.patient_id || '-'}</td>
+                <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.date || '-'}</td>
+                <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.insurance_name || entry.insurance_status || '-'}</td>
+                <td class="py-3 px-4 text-slate-900 dark:text-white">${entry.chart_entry || '-'}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        dataTableContainer.classList.remove('hidden');
+    }
+
+    // Clear all filters
+    function clearFilters(rerender = true) {
+        filterPatientId.value = '';
+        filterDate.value = '';
+        filterInsurance.value = '';
+        filterChartEntry.value = '';
+        clearFiltersBtn.classList.add('hidden');
+
+        if (rerender) {
+            applyFilters();
+        }
+    }
+
+    // Debounced filter handler
+    function onFilterChange() {
+        clearTimeout(filterDebounceTimer);
+        filterDebounceTimer = setTimeout(applyFilters, 150);
+    }
+
+    // Export to CSV
+    function exportToCsv() {
+        if (filteredEntries.length === 0) return;
+
+        const headers = ['patient_id', 'date', 'insurance_status', 'insurance_name', 'chart_entry', 'service_codes'];
+        const rows = [headers.join(',')];
+
+        for (const entry of filteredEntries) {
+            const row = [
+                entry.patient_id || '',
+                entry.date || '',
+                entry.insurance_status || '',
+                entry.insurance_name || '',
+                `"${String(entry.chart_entry || '').replace(/"/g, '""')}"`,
+                `"${(entry.service_codes || []).join(', ')}"`
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csv = rows.join('\n');
+        downloadFile(csv, `chart_entries_${currentCenterId}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+    }
+
+    // Export to JSON
+    function exportToJson() {
+        if (filteredEntries.length === 0) return;
+
+        const data = {
+            export_timestamp: new Date().toISOString(),
+            center_id: currentCenterId,
+            total_entries: filteredEntries.length,
+            entries: filteredEntries
+        };
+
+        const json = JSON.stringify(data, null, 2);
+        downloadFile(json, `chart_entries_${currentCenterId}_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+    }
+
+    // Download file helper
+    function downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // Switch view - always updates content on each call
@@ -464,6 +659,20 @@
         e.preventDefault();
         switchView('data');
     });
+
+    // Filter event listeners (with debounce)
+    filterPatientId.addEventListener('input', onFilterChange);
+    filterDate.addEventListener('input', onFilterChange);
+    filterInsurance.addEventListener('input', onFilterChange);
+    filterChartEntry.addEventListener('input', onFilterChange);
+
+    // Clear filters buttons
+    clearFiltersBtn.addEventListener('click', () => clearFilters(true));
+    clearFiltersLink.addEventListener('click', () => clearFilters(true));
+
+    // Export buttons
+    exportCsvBtn.addEventListener('click', exportToCsv);
+    exportJsonBtn.addEventListener('click', exportToJson);
 
     // Initial load
     loadCenters();
