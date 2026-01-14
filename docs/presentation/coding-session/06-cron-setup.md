@@ -1,10 +1,22 @@
 # Step 6: Cron Job Setup
 
+> **💬 Talking Points**
+> - "Now we make it run automatically every day - no human intervention"
+> - "Cron is Unix's built-in scheduler - been around since the 70s"
+> - "I'll show you 5 different approaches - pick what fits your environment"
+
+---
+
 ## Goal
 
 Automate the extraction to run daily without manual intervention.
 
 ---
+
+> **💬 Talking Points - Cron Format**
+> - "Five stars, five positions - minute, hour, day, month, weekday"
+> - "The asterisk means 'any' - so * * * * * runs every minute"
+> - "This format is universal - works the same on Linux, Mac, Docker"
 
 ## What is Cron?
 
@@ -30,6 +42,11 @@ Cron is a Unix/Linux job scheduler. It runs commands at specified times.
 | `0 6 * * 1-5` | Monday-Friday at 6:00 AM |
 
 ---
+
+> **💬 Talking Points - Option 1**
+> - "This is the classic approach - a bash wrapper script"
+> - "Important: activate the venv inside the script"
+> - "Redirect output to a log file so you can debug later"
 
 ## Option 1: Simple Cron Job (Linux/macOS)
 
@@ -111,6 +128,11 @@ chmod +x ~/ivoris-extract-docker.sh
 
 ---
 
+> **💬 Talking Points - Systemd**
+> - "Systemd is the modern replacement for cron on Linux"
+> - "Better logging, dependency management, and reliability"
+> - "Use this if you're deploying to a production Linux server"
+
 ## Option 3: Systemd Timer (Modern Linux)
 
 More robust than cron, with better logging.
@@ -161,6 +183,11 @@ systemctl list-timers | grep ivoris
 ```
 
 ---
+
+> **💬 Talking Points - launchd**
+> - "On macOS, launchd is preferred over cron"
+> - "It handles sleep/wake correctly - cron can miss jobs on laptops"
+> - "XML format is verbose but it's the Apple way"
 
 ## Option 4: macOS launchd
 
@@ -246,6 +273,11 @@ nohup python scheduler.py > scheduler.log 2>&1 &
 ```
 
 ---
+
+> **💬 Talking Points - Logging**
+> - "Logging is crucial for production - you need to know when things fail"
+> - "Rotate logs to prevent filling up disk space"
+> - "Consider sending alerts when extraction fails"
 
 ## Logging Best Practices
 
@@ -350,6 +382,11 @@ cat logs/extraction.log
 | Container | Docker cron | `Dockerfile` with cron |
 
 ---
+
+> **💬 Talking Points - Wrap Up**
+> - "And that's it! From database to automated daily extraction"
+> - "This same pattern works for any data extraction project"
+> - "Questions?"
 
 ## Complete!
 

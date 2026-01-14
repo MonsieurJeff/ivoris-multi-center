@@ -1,5 +1,12 @@
 # Step 3: Explore Database Manually
 
+> **💬 Talking Points**
+> - "This is the detective work - we have a database, no documentation"
+> - "Every customer database will be different, so you need these exploration skills"
+> - "The goal: understand the schema before writing any extraction code"
+
+---
+
 ## Goal
 
 Discover the database structure without any documentation. This is the real-world scenario when you receive a customer's database.
@@ -46,6 +53,11 @@ GO
 ```
 
 ---
+
+> **💬 Talking Points - INFORMATION_SCHEMA**
+> - "INFORMATION_SCHEMA is a SQL standard - works in MySQL, PostgreSQL, SQL Server"
+> - "It's the meta-database - data about your data"
+> - "These queries work on ANY database, memorize them"
 
 ## List All Tables
 
@@ -173,6 +185,11 @@ PATIENT.KASSEID (int)
 
 ---
 
+> **💬 Talking Points - Exploring Tables**
+> - "Always use TOP or LIMIT when exploring - you don't want 10 million rows"
+> - "Look at real data to understand what each column means"
+> - "KARTEI is 'chart' in German - this is the main table we need"
+
 ## Explore Individual Tables
 
 ### Look at KARTEI (Chart entries)
@@ -251,6 +268,11 @@ LEISTUNGID  PATIENTID  DATUM       LEISTUNG
 
 ---
 
+> **💬 Talking Points - Keys & Relationships**
+> - "Primary keys tell us how tables are uniquely identified"
+> - "Foreign keys tell us how tables connect to each other"
+> - "This reveals the data model without any documentation"
+
 ## Find Primary Keys and Foreign Keys
 
 ```sql
@@ -303,6 +325,11 @@ FK_PATIENT_KASSE     PATIENT       KASSEID        KASSE             KASSEID
 ```
 
 ---
+
+> **💬 Talking Points - ER Diagram**
+> - "This is what we've discovered - PATIENT is the central table"
+> - "Notice how KARTEI and LEISTUNG both link to PATIENT"
+> - "This is how dental software works - everything relates to a patient"
 
 ## Entity Relationship Diagram (Mental Model)
 

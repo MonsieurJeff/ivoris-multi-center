@@ -61,3 +61,38 @@ cat data/output/ivoris_chart_entries_2022-01-18.json
 ```
 
 But for the coding session, we go step by step...
+
+---
+
+## Preparation Materials
+
+| Document | Purpose |
+|----------|---------|
+| [00-preflight-checklist.md](./00-preflight-checklist.md) | Pre-session verification (run 30 min before) |
+| [CHEATSHEET.md](./CHEATSHEET.md) | One-page quick reference |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Common problems and solutions |
+| [TIMING-GUIDE.md](./TIMING-GUIDE.md) | Pacing checkpoints and fallback paths |
+| [QA-PREPARATION.md](./QA-PREPARATION.md) | Anticipated questions and answers |
+| [INTERACTIVE-ELEMENTS.md](./INTERACTIVE-ELEMENTS.md) | Audience engagement points |
+| [SLIDES.md](./SLIDES.md) | Simple slides for section transitions |
+| [HANDOUT.md](./HANDOUT.md) | Post-session summary to share |
+
+---
+
+## Backup Materials
+
+| File | Purpose |
+|------|---------|
+| [backup/](./backup/) | Pre-generated output files if live demo fails |
+| [backup/expected-terminal-output.txt](./backup/expected-terminal-output.txt) | All expected terminal output |
+
+---
+
+## Recovery
+
+If things go wrong during the session:
+
+```bash
+# One command to reset everything
+./scripts/reset-demo.sh
+```

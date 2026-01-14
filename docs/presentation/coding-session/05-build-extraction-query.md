@@ -1,5 +1,12 @@
 # Step 5: Build the Extraction Query
 
+> **💬 Talking Points**
+> - "Now we build the query step by step - not all at once"
+> - "I'll show you how I approach complex queries incrementally"
+> - "Each step adds one more piece until we have the full solution"
+
+---
+
 ## Goal
 
 Build a SQL query that extracts:
@@ -10,6 +17,11 @@ Build a SQL query that extracts:
 ---
 
 ## Step-by-Step Query Building
+
+> **💬 Talking Points - Step 1**
+> - "Always start simple - just the main table with the core fields"
+> - "We can see 6 rows for this date - that's our baseline"
+> - "Now we'll enrich this data step by step"
 
 ### Step 1: Start with KARTEI (base table)
 
@@ -100,6 +112,11 @@ DATUM       PATIENTID  TYP  insurance_name          EINTRAG
 
 ---
 
+> **💬 Talking Points - CASE Statement**
+> - "The raw data has 'G' and 'P' - that's not user-friendly"
+> - "CASE is SQL's if/else - transforms values inline"
+> - "This is a common pattern for data cleanup"
+
 ### Step 4: Transform TYP to readable status
 
 ```sql
@@ -135,6 +152,11 @@ date        patient_id  insurance_status  insurance_name          chart_entry
 ✅ Insurance status is now human-readable.
 
 ---
+
+> **💬 Talking Points - Aggregation**
+> - "Here's the tricky part - one visit can have multiple billing codes"
+> - "STRING_AGG combines them into one comma-separated string"
+> - "The subquery is correlated - it runs once per row"
 
 ### Step 5: Add service codes (with aggregation)
 
@@ -200,6 +222,11 @@ date        patient_id  insurance_status  insurance_name          chart_entry   
 ✅ All 5 required fields!
 
 ---
+
+> **💬 Talking Points - Final Query**
+> - "FOR JSON PATH turns the result into JSON directly in SQL Server"
+> - "This is a SQL Server feature - not all databases have it"
+> - "For portability, we'll do JSON conversion in Python instead"
 
 ## Final Query with JSON Output
 

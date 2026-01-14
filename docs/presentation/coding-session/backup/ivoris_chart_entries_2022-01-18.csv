@@ -1,0 +1,7 @@
+date,patient_id,insurance_status,insurance_name,chart_entry,service_codes
+2022-01-18,1,GKV,AOK Bayern,"Kontrolle, Befund unauffällig","01, 1040"
+2022-01-18,1,GKV,AOK Bayern,Zahnreinigung durchgeführt,"01, 1040"
+2022-01-18,2,GKV,DAK Gesundheit,Füllungstherapie Zahn 36,13b
+2022-01-18,3,GKV,Techniker Krankenkasse,Röntgenaufnahme OPG,Ä935
+2022-01-18,4,PKV,PRIVAT,Beratung Zahnersatz,
+2022-01-18,5,GKV,Barmer,Professionelle Zahnreinigung,

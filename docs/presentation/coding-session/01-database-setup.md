@@ -1,5 +1,12 @@
 # Step 1: Database Setup from Backup
 
+> **💬 Talking Points**
+> - "In reality, customers send us their database backup files - usually `.bak` files from SQL Server"
+> - "For security reasons, we always work on a copy, never the production database"
+> - "Today I'll show you three ways to set this up - choose based on your situation"
+
+---
+
 ## Context
 
 Ivoris dental software uses Microsoft SQL Server. In a real scenario, you would:
@@ -7,6 +14,11 @@ Ivoris dental software uses Microsoft SQL Server. In a real scenario, you would:
 2. Restore it to your local SQL Server for development
 
 ---
+
+> **💬 Talking Points - Option A**
+> - "This is the real-world scenario - customer gives you their backup"
+> - "The `WITH MOVE` is crucial - it remaps the file paths to our container"
+> - "Always use `REPLACE` to overwrite if you're doing multiple restores"
 
 ## Option A: Restore from .bak Backup File
 
@@ -61,6 +73,11 @@ GO
 **Expected:** `DentalDB | ONLINE`
 
 ---
+
+> **💬 Talking Points - Option B**
+> - "For demos or when you don't have customer data yet"
+> - "Notice the German column names - this is authentic to the Ivoris software"
+> - "TYP with 'G' and 'P' represents the German insurance system"
 
 ## Option B: Create Test Database (For Demo)
 
@@ -119,6 +136,11 @@ GO
 ```
 
 ---
+
+> **💬 Talking Points - Option C**
+> - "This is the fastest way - everything is pre-configured"
+> - "The docker-compose handles all the setup automatically"
+> - "We'll use this for today's session to save time"
 
 ## Option C: Use Existing Docker Setup
 

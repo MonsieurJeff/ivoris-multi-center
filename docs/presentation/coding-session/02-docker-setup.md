@@ -1,5 +1,12 @@
 # Step 2: Docker Setup
 
+> **💬 Talking Points**
+> - "Docker lets us run SQL Server on Mac/Windows without installing it natively"
+> - "It's the same SQL Server that runs in production - just containerized"
+> - "One command to start, one command to stop - no messy installations"
+
+---
+
 ## Why Docker?
 
 - **Portability**: Works on any machine (Mac, Windows, Linux)
@@ -8,6 +15,12 @@
 - **Easy scaling**: Spin up multiple databases for testing
 
 ---
+
+> **💬 Talking Points - docker-compose.yml**
+> - "Let me walk through this file line by line"
+> - "ACCEPT_EULA=Y - Microsoft requires this legally"
+> - "The volume is key - without it, data would be lost when container stops"
+> - "Port 1433 is the default SQL Server port"
 
 ## The docker-compose.yml Explained
 
@@ -98,6 +111,11 @@ docker-compose down -v
 ```
 
 ---
+
+> **💬 Talking Points - Connecting**
+> - "There are three ways to connect - CLI, GUI, or Python"
+> - "For data exploration, I prefer Azure Data Studio - it's free and works great"
+> - "For scripting and automation, we'll use pyodbc from Python"
 
 ## Connect to SQL Server
 

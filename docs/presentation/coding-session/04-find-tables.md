@@ -1,5 +1,12 @@
 # Step 4: Find the Right Tables
 
+> **💬 Talking Points**
+> - "Now we map the business requirements to actual database columns"
+> - "This is where domain knowledge meets technical knowledge"
+> - "The customer said 'Versicherungsstatus' - we need to find where that lives"
+
+---
+
 ## The Requirement
 
 Extract these 5 fields daily:
@@ -66,6 +73,11 @@ PATIENT     PATIENTID
 
 ---
 
+> **💬 Talking Points - Insurance Status**
+> - "This is the interesting one - insurance status requires a JOIN"
+> - "GKV = public insurance, PKV = private insurance, NULL = self-pay"
+> - "Understanding German healthcare system helps here"
+
 ### Field 3: Versicherungsstatus (Insurance Status)
 
 **Search:** Where is insurance information?
@@ -125,6 +137,11 @@ Füllungstherapie Zahn 36
 
 ---
 
+> **💬 Talking Points - Service Codes**
+> - "One patient visit can have multiple services - we need aggregation"
+> - "STRING_AGG is like Python's ', '.join() - concatenates values"
+> - "This is the trickiest part of the query"
+
 ### Field 5: Leistungen (Service Codes)
 
 **Search:** Where are service codes?
@@ -179,6 +196,11 @@ PATIENTID  DATUM       SERVICE_COUNT
 | Leistungen | `LEISTUNG.LEISTUNG` (aggregated) |
 
 ---
+
+> **💬 Talking Points - JOIN Strategy**
+> - "KARTEI is our starting point - that's where the chart entries are"
+> - "LEFT JOIN preserves all chart entries even if no insurance or services"
+> - "This is a 3-table JOIN plus a correlated subquery"
 
 ## Join Path
 

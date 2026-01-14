@@ -1,5 +1,12 @@
 # Step 5b: Create Extraction Script
 
+> **💬 Talking Points**
+> - "Now we wrap our SQL query in Python for automation"
+> - "I'll show two approaches: modular (for production) and single-file (for quick demos)"
+> - "The goal is a CLI tool we can run from cron"
+
+---
+
 ## Goal
 
 Create a Python script that:
@@ -49,6 +56,11 @@ python-dotenv>=1.0.0
 ```
 
 ---
+
+> **💬 Talking Points - Database Adapter**
+> - "Context manager pattern ensures connections are always closed"
+> - "TrustServerCertificate=yes is needed for local Docker SSL"
+> - "This class is reusable across all our extraction services"
 
 ## Step 2: Database Connection (adapters/database.py)
 
@@ -111,6 +123,11 @@ print('Connected!' if db.test_connection() else 'Failed!')
 
 ---
 
+> **💬 Talking Points - Data Model**
+> - "Dataclass gives us type safety and auto-generated __init__"
+> - "to_dict() converts for JSON serialization"
+> - "This is our contract - what the output looks like"
+
 ## Step 3: Data Model (models/chart_entry.py)
 
 ```python
@@ -143,6 +160,11 @@ class ChartEntry:
 ```
 
 ---
+
+> **💬 Talking Points - Extraction Service**
+> - "The SQL query is the same one we built manually"
+> - "We parse the comma-separated service codes into a Python list"
+> - "ensure_ascii=False preserves German characters like ü and ö"
 
 ## Step 4: Extraction Service (services/daily_extract.py)
 
@@ -279,6 +301,11 @@ class DailyExtractService:
 ```
 
 ---
+
+> **💬 Talking Points - CLI**
+> - "argparse gives us professional command-line argument handling"
+> - "Default to yesterday's date - that's what cron will use"
+> - "--test-connection is useful for debugging"
 
 ## Step 5: CLI Entry Point (main.py)
 
@@ -468,6 +495,11 @@ date,patient_id,insurance_status,insurance_name,chart_entry,service_codes
 ```
 
 ---
+
+> **💬 Talking Points - Single File Version**
+> - "For demos or one-off scripts, you don't need all that structure"
+> - "This is the same logic in under 100 lines"
+> - "Good for prototyping, then refactor when it works"
 
 ## Complete Script (Single File Version)
 

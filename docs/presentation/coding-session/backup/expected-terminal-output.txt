@@ -1,0 +1,125 @@
+================================================================================
+EXPECTED TERMINAL OUTPUT - Use this if live demo fails
+================================================================================
+
+--- Docker Startup ---
+$ docker-compose up -d
+Creating network "ivoris-pipeline_default" with the default driver
+Creating ivoris-sqlserver ... done
+
+$ docker ps | grep ivoris
+abc123def456   mcr.microsoft.com/mssql/server:2019-latest   Up 2 minutes   0.0.0.0:1433->1433/tcp   ivoris-sqlserver
+
+--- SQL Server Connection ---
+$ docker exec -it ivoris-sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d DentalDB
+1>
+
+--- List Tables ---
+1> SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;
+2> GO
+TABLE_NAME
+--------------------
+KARTEI
+KASSE
+LEISTUNG
+PATIENT
+
+(4 rows affected)
+
+--- List Columns (one per line) ---
+1> SELECT TABLE_NAME + '.' + COLUMN_NAME + ' (' + DATA_TYPE + ')' FROM INFORMATION_SCHEMA.COLUMNS ORDER BY TABLE_NAME, ORDINAL_POSITION;
+2> GO
+
+KARTEI.KARTEIID (int)
+KARTEI.PATIENTID (int)
+KARTEI.DATUM (date)
+KARTEI.EINTRAG (nvarchar)
+KASSE.KASSEID (int)
+KASSE.NAME (nvarchar)
+KASSE.TYP (char)
+LEISTUNG.LEISTUNGID (int)
+LEISTUNG.PATIENTID (int)
+LEISTUNG.DATUM (date)
+LEISTUNG.LEISTUNG (nvarchar)
+PATIENT.PATIENTID (int)
+PATIENT.NAME (nvarchar)
+PATIENT.VORNAME (nvarchar)
+PATIENT.GEBDAT (date)
+PATIENT.KASSEID (int)
+
+(16 rows affected)
+
+--- Sample KARTEI Data ---
+1> SELECT TOP 5 * FROM KARTEI;
+2> GO
+KARTEIID  PATIENTID  DATUM       EINTRAG
+--------  ---------  ----------  ----------------------------------
+1         1          2022-01-18  Kontrolle, Befund unauffällig
+2         1          2022-01-18  Zahnreinigung durchgeführt
+3         2          2022-01-18  Füllungstherapie Zahn 36
+4         3          2022-01-18  Röntgenaufnahme OPG
+5         4          2022-01-18  Beratung Zahnersatz
+
+(5 rows affected)
+
+--- Sample KASSE Data ---
+1> SELECT * FROM KASSE;
+2> GO
+KASSEID  NAME                    TYP
+-------  ----------------------  ---
+1        AOK Bayern              G
+2        DAK Gesundheit          G
+3        Techniker Krankenkasse  G
+4        PRIVAT                  P
+5        Barmer                  G
+
+(5 rows affected)
+
+--- Final Extraction Query ---
+1> SELECT
+2>     k.DATUM AS date,
+3>     k.PATIENTID AS patient_id,
+4>     CASE ka.TYP
+5>         WHEN 'G' THEN 'GKV'
+6>         WHEN 'P' THEN 'PKV'
+7>         ELSE 'Selbstzahler'
+8>     END AS insurance_status,
+9>     ISNULL(ka.NAME, '') AS insurance_name,
+10>    k.EINTRAG AS chart_entry,
+11>    ISNULL((
+12>        SELECT STRING_AGG(l.LEISTUNG, ', ')
+13>        FROM LEISTUNG l
+14>        WHERE l.PATIENTID = k.PATIENTID AND l.DATUM = k.DATUM
+15>    ), '') AS service_codes
+16> FROM KARTEI k
+17> JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
+18> LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
+19> WHERE k.DATUM = '2022-01-18';
+20> GO
+
+date        patient_id  insurance_status  insurance_name          chart_entry                       service_codes
+----------  ----------  ----------------  ----------------------  --------------------------------  -------------
+2022-01-18  1           GKV               AOK Bayern              Kontrolle, Befund unauffällig    01, 1040
+2022-01-18  1           GKV               AOK Bayern              Zahnreinigung durchgeführt       01, 1040
+2022-01-18  2           GKV               DAK Gesundheit          Füllungstherapie Zahn 36         13b
+2022-01-18  3           GKV               Techniker Krankenkasse  Röntgenaufnahme OPG              Ä935
+2022-01-18  4           PKV               PRIVAT                  Beratung Zahnersatz
+2022-01-18  5           GKV               Barmer                  Professionelle Zahnreinigung
+
+(6 rows affected)
+
+--- Python Script Output ---
+$ python src/main.py --test-connection
+✓ Database connection successful
+
+$ python src/main.py --daily-extract --date 2022-01-18
+Extracting chart entries for 2022-01-18...
+Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.json
+Done! Output: data/output/ivoris_chart_entries_2022-01-18.json
+
+$ python src/main.py --daily-extract --date 2022-01-18 --format csv
+Extracting chart entries for 2022-01-18...
+Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.csv
+Done! Output: data/output/ivoris_chart_entries_2022-01-18.csv
+
+================================================================================
