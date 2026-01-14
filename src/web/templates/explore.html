@@ -141,11 +141,6 @@
                     <p class="text-slate-500 dark:text-slate-400">No entries found for this date</p>
                 </div>
 
-                <div id="data-no-results" class="hidden py-8 text-center">
-                    <p class="text-slate-500 dark:text-slate-400">No entries match your filters</p>
-                    <button id="clear-filters-link" class="mt-2 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">Clear all filters</button>
-                </div>
-
                 <div class="overflow-x-auto" id="data-table-container">
                     <table class="min-w-full text-sm">
                         <thead>
@@ -181,6 +176,14 @@
                             </tr>
                         </thead>
                         <tbody id="data-table">
+                        </tbody>
+                        <tbody id="data-no-results" class="hidden">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center">
+                                    <p class="text-slate-500 dark:text-slate-400">No entries match your filters</p>
+                                    <button id="clear-filters-link" class="mt-2 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">Clear all filters</button>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -228,8 +231,6 @@
     const filterInsurance = document.getElementById('filter-insurance');
     const filterChartEntry = document.getElementById('filter-chart-entry');
     const clearFiltersBtn = document.getElementById('clear-filters-btn');
-    const clearFiltersLink = document.getElementById('clear-filters-link');
-    const dataNoResults = document.getElementById('data-no-results');
 
     // Export buttons
     const exportCsvBtn = document.getElementById('export-csv-btn');
@@ -394,7 +395,7 @@
         dataLoading.classList.remove('hidden');
         dataError.classList.add('hidden');
         dataEmpty.classList.add('hidden');
-        dataNoResults.classList.add('hidden');
+        document.getElementById('data-no-results').classList.add('hidden');
         dataTableContainer.classList.add('hidden');
 
         try {
@@ -486,20 +487,17 @@
     // Render table with current filtered entries
     function renderTable() {
         const tbody = document.getElementById('data-table');
-        const dataTableContainer = document.getElementById('data-table-container');
-        const dataEmpty = document.getElementById('data-empty');
+        const noResultsTbody = document.getElementById('data-no-results');
 
         tbody.innerHTML = '';
 
         if (filteredEntries.length === 0 && allEntries.length > 0) {
-            // Has data but filters hide all
-            dataTableContainer.classList.add('hidden');
-            dataNoResults.classList.remove('hidden');
-            dataEmpty.classList.add('hidden');
+            // Has data but filters hide all - show no results message in table
+            noResultsTbody.classList.remove('hidden');
             return;
         }
 
-        dataNoResults.classList.add('hidden');
+        noResultsTbody.classList.add('hidden');
 
         for (const entry of filteredEntries) {
             const row = document.createElement('tr');
@@ -512,8 +510,6 @@
             `;
             tbody.appendChild(row);
         }
-
-        dataTableContainer.classList.remove('hidden');
     }
 
     // Clear all filters
@@ -668,7 +664,7 @@
 
     // Clear filters buttons
     clearFiltersBtn.addEventListener('click', () => clearFilters(true));
-    clearFiltersLink.addEventListener('click', () => clearFilters(true));
+    document.getElementById('clear-filters-link').addEventListener('click', () => clearFilters(true));
 
     // Export buttons
     exportCsvBtn.addEventListener('click', exportToCsv);
