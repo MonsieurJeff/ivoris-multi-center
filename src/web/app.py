@@ -226,6 +226,102 @@ async def extract_data(
     }
 
 
+@app.get("/api/table-data/{center_id}/{table_name}")
+async def get_table_data(
+    center_id: str,
+    table_name: str,
+    limit: int = Query(default=100, le=1000),
+):
+    """Get raw data from a specific table in a center's database."""
+    import pyodbc
+
+    config = get_config()
+    center = config.get_center(center_id)
+
+    if not center:
+        raise HTTPException(status_code=404, detail=f"Center not found: {center_id}")
+
+    # Load mapping to get actual table/column names
+    mapping_file = MAPPINGS_DIR / f"{center_id}_mapping.json"
+    if not mapping_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No mapping for {center_id}. Run 'generate-mappings' first.",
+        )
+
+    with open(mapping_file) as f:
+        mapping = json.load(f)
+
+    # Get table mapping
+    table_mapping = mapping.get("tables", {}).get(table_name)
+    if not table_mapping:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Table '{table_name}' not found in mapping for {center_id}",
+        )
+
+    actual_table = table_mapping.get("actual_name")
+    schema = mapping.get("schema", "dbo")
+    columns_mapping = table_mapping.get("columns", {})
+
+    # Build column list (canonical -> actual)
+    columns = []
+    select_parts = []
+    for canonical, col_data in columns_mapping.items():
+        actual_col = col_data.get("actual_name", canonical)
+        columns.append(canonical)
+        select_parts.append(f"[{actual_col}] AS [{canonical}]")
+
+    if not select_parts:
+        raise HTTPException(status_code=400, detail="No columns found in mapping")
+
+    # Query the database
+    try:
+        conn_str = (
+            f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+            f"SERVER=localhost,1434;"
+            f"DATABASE={center.database};"
+            f"UID=sa;PWD=Clinero2026;"
+            f"TrustServerCertificate=yes"
+        )
+        conn = pyodbc.connect(conn_str, timeout=10)
+        cursor = conn.cursor()
+
+        sql = f"SELECT TOP {limit} {', '.join(select_parts)} FROM [{schema}].[{actual_table}]"
+        cursor.execute(sql)
+
+        rows = []
+        for row in cursor.fetchall():
+            row_dict = {}
+            for i, col in enumerate(columns):
+                value = row[i]
+                # Convert dates and other types to string for JSON
+                if hasattr(value, 'isoformat'):
+                    value = value.isoformat()
+                elif value is not None:
+                    value = str(value) if not isinstance(value, (int, float, bool)) else value
+                row_dict[col] = value
+            rows.append(row_dict)
+
+        cursor.close()
+        conn.close()
+
+        return {
+            "center_id": center_id,
+            "table": table_name,
+            "actual_table": actual_table,
+            "columns": columns,
+            "row_count": len(rows),
+            "rows": rows,
+        }
+
+    except pyodbc.Error as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}",
+        )
+
+
 @app.get("/api/benchmark")
 async def run_benchmark():
     """Run performance benchmark."""
