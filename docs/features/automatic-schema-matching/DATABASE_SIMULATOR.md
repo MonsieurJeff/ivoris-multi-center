@@ -3,6 +3,7 @@
 **Purpose:** Generate realistic test databases for Automatic Schema Matching development and demos.
 **Format:** Docker SQL Server containers
 **Scale:** 10 simulated dental centers
+**Ordering:** Extreme → Normal (stress-first approach)
 
 ---
 
@@ -10,380 +11,91 @@
 
 ### Goals
 
-1. **Testing:** Verify detection limits, thresholds, and edge cases
-2. **Demo:** Showcase the feature with realistic data
-3. **Cross-DB Learning:** Demonstrate how the system improves with each center
+1. **Robustness Testing:** Start with extreme cases to find breaking points
+2. **Accuracy Validation:** Progress to realistic scenarios to verify matching quality
+3. **Demo:** Showcase feature handling worst-to-best cases
 4. **Ground Truth:** Every database has a manifest of expected results
 
-### Architecture
+### Design Philosophy: Extreme → Normal
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Docker Compose Environment                       │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐     ┌──────────┐           │
-│  │ Center 1 │ │ Center 2 │ │ Center 3 │ ... │ Center 10│           │
-│  │ Munich   │ │ Berlin   │ │ Hamburg  │     │ Vienna   │           │
-│  │ :1433    │ │ :1434    │ │ :1435    │     │ :1442    │           │
-│  └──────────┘ └──────────┘ └──────────┘     └──────────┘           │
-│       │            │            │                 │                 │
-│       └────────────┴────────────┴─────────────────┘                 │
-│                              │                                       │
-│                    ┌─────────────────┐                              │
-│                    │  Ground Truth   │                              │
-│                    │  Manifests      │                              │
-│                    │  (YAML files)   │                              │
-│                    └─────────────────┘                              │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SIMULATION PROGRESSION                           │
+│                                                                          │
+│   EXTREME ──────────────────────────────────────────────────► NORMAL    │
+│                                                                          │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
+│   │   ZONE A    │  │   ZONE B    │  │   ZONE C    │  │   ZONE D    │   │
+│   │  Synthetic  │  │  Realistic  │  │  Moderate   │  │   Clean     │   │
+│   │  Extremes   │  │  Extremes   │  │ Variations  │  │  Baselines  │   │
+│   │             │  │             │  │             │  │             │   │
+│   │ POSSIBILI-  │  │  OBSERVED   │  │   COMMON    │  │   IDEAL     │   │
+│   │   TIES      │  │ WORST CASES │  │  REALITIES  │  │   STATE     │   │
+│   │             │  │             │  │             │  │             │   │
+│   │ Centers 1-2 │  │ Centers 3-4 │  │ Centers 5-7 │  │ Centers 8-10│   │
+│   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │
+│                                                                          │
+│   "Can it break?"  "Can it handle   "Can it adapt?"  "Is it accurate?"  │
+│                     real chaos?"                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Why Extreme → Normal?
 
-## Ground Truth Manifest Format
+| Principle | Rationale |
+|-----------|-----------|
+| **Fail Fast** | Discover breaking points before investing in "easy" cases |
+| **Defensive Design** | If it handles chaos, normal is trivial |
+| **Confidence Building** | Passing edge cases = high confidence in robustness |
+| **Regression Priority** | Edge cases break first during refactoring |
 
-Every simulated database has a companion YAML file defining expected results.
+### Possibilities vs Realities Framework
 
-```yaml
-# ground_truth/center_01_munich.yml
-
-center:
-  id: "center_01"
-  name: "Munich Dental Center"
-  schema: "ck"
-  language: "german"
-  data_quality: "clean"  # clean | moderate | messy
-
-expected_mappings:
-  KARTEI:
-    PATNR:
-      canonical_entity: patient_id
-      expected_confidence: ">=0.90"
-      risk_class: critical
-      match_reason: "Known column name"
-    DATUM:
-      canonical_entity: date
-      expected_confidence: ">=0.85"
-      format: YYYYMMDD
-      validation: date_format
-    BEMERKUNG:
-      canonical_entity: chart_note
-      expected_confidence: ">=0.80"
-    DELKZ:
-      canonical_entity: soft_delete
-      expected_confidence: ">=0.85"
-      values: [0, 1]
-
-  KASSEN:
-    KASESSION:
-      canonical_entity: insurance_id
-      expected_confidence: ">=0.90"
-    BEZEICHNUNG:
-      canonical_entity: insurance_name
-      expected_confidence: ">=0.85"
-      sample_values: ["DAK Gesundheit", "AOK Bayern", "BARMER"]
-    ART:
-      canonical_entity: insurance_type
-      expected_confidence: ">=0.80"
-      values: ["P", "1", "2", "3"]
-
-expected_quality_flags:
-  KARTEI.OLD_STATUS:
-    label: abandoned
-    reason: "No values after 2019-03-15"
-  KARTEI.UNUSED_FIELD:
-    label: empty
-    reason: "100% NULL"
-  PATIENT.FAX:
-    label: mostly_empty
-    reason: "97% NULL"
-  KARTEI.DEBUG_COL:
-    label: test_only
-    reason: "All values match test patterns"
-
-expected_value_bank_contributions:
-  insurance_name:
-    - "DAK Gesundheit"
-    - "AOK Bayern"
-    - "BARMER"
-    - "Techniker Krankenkasse"
-  insurance_type:
-    - "P"
-    - "1"
-    - "2"
-
-statistics:
-  total_tables: 50
-  total_columns: 487
-  expected_auto_match_rate: "85%"
-  expected_review_queue_size: 73
-  expected_excluded_columns: 45
-```
+| Type | Definition | Purpose | Zone |
+|------|------------|---------|------|
+| **Possibilities (Synthetic)** | Constructed worst-case scenarios that *could* exist | Test detection limits, boundary conditions | A |
+| **Realities (Observed)** | Patterns from actual Ivoris databases | Validate real-world handling | B, C, D |
 
 ---
 
 ## The 10 Centers
 
-### Design Philosophy
+### Summary Table
 
-| Centers | Purpose | Characteristics |
-|---------|---------|-----------------|
-| 1-2 | **Baseline/Seed** | Clean data, standard naming, seeds the system |
-| 3-4 | **Naming Variations** | Different column names for same concepts |
-| 5-6 | **Data Quality Issues** | Abandoned, empty, misused columns |
-| 7-8 | **Threshold Edge Cases** | Values at exact detection limits |
-| 9-10 | **Realistic Messy** | Combination of all issues, like real production |
-
----
-
-### Center 1: Munich (Baseline - Clean)
-
-**Purpose:** Seed the system with clean, well-structured data.
-
-```yaml
-center_id: center_01
-name: "Munich Dental Center"
-port: 1433
-schema: ck
-quality: clean
-```
-
-**Schema (Ivoris-realistic):**
-
-| Table | Description | Key Columns |
-|-------|-------------|-------------|
-| PATIENT | Patient master | PATNR (PK), NAME, VORNAME, GEBDAT |
-| KARTEI | Chart entries | KARESSION (PK), PATNR (FK), DATUM, BEMERKUNG, DELKZ |
-| KASSEN | Insurance companies | KASESSION (PK), BEZEICHNUNG, ART |
-| PATKASSE | Patient-Insurance link | PATNR (FK), KASESSION (FK), GUELTIG_AB |
-| LEISTUNG | Services/Procedures | LEISESSION (PK), BEZEICHNUNG, GEBUEHR |
-| BEHANDLUNG | Treatments | BEHSESSION (PK), PATNR (FK), DATUM, LEISESSION (FK) |
-
-**Data Characteristics:**
-- 1,000 patients
-- 15,000 chart entries
-- 50 insurance companies
-- Clean date formats (YYYYMMDD)
-- No abandoned columns
-- <5% NULL in optional fields
-- Standard German column names
-
-**Expected Results:**
-- Auto-match rate: 90%+
-- Review queue: <50 items
-- Excluded columns: <10
+| Zone | Centers | Type | Purpose | Expected Auto-Match |
+|------|---------|------|---------|---------------------|
+| **A** | 1-2 | Synthetic Extremes | Break the system | 0-40% (expected failures) |
+| **B** | 3-4 | Realistic Extremes | Handle chaos gracefully | 50-65% |
+| **C** | 5-7 | Moderate Variations | Test adaptability | 75-85% |
+| **D** | 8-10 | Clean Baselines | Verify accuracy | 90-98% |
 
 ---
 
-### Center 2: Berlin (Baseline - Clean, Slight Variations)
+## ZONE A: SYNTHETIC EXTREMES (Possibilities)
 
-**Purpose:** Second clean center to establish cross-DB consistency.
-
-```yaml
-center_id: center_02
-name: "Berlin Dental Center"
-port: 1434
-schema: ck
-quality: clean
-```
-
-**Variations from Center 1:**
-- Soft delete column: `DELETED` instead of `DELKZ`
-- Some additional columns not in Center 1
-- Different insurance company names (regional)
-
-**Expected Results:**
-- System learns `DELETED` → soft_delete
-- Cross-DB consistency tracking begins
-- Auto-match rate: 92%+ (benefits from Center 1)
+**Purpose:** Test the boundaries of detection. These scenarios may never exist in reality but prove system robustness.
 
 ---
 
-### Center 3: Hamburg (Naming Variations)
-
-**Purpose:** Test cross-database learning with different column names.
-
-```yaml
-center_id: center_03
-name: "Hamburg Dental Center"
-port: 1435
-schema: dental
-quality: moderate
-```
-
-**Column Name Variations:**
-
-| Canonical | Center 1 | Center 3 |
-|-----------|----------|----------|
-| patient_id | PATNR | PATIENT_NR |
-| date | DATUM | EINTRAG_DATUM |
-| chart_note | BEMERKUNG | NOTIZ |
-| soft_delete | DELKZ | GELOESCHT |
-| insurance_name | BEZEICHNUNG | KASSEN_NAME |
-
-**Expected Results:**
-- LLM correctly classifies new names
-- After verification, new names added to known_names
-- Future centers benefit from learned variants
-
----
-
-### Center 4: Frankfurt (Naming Variations + English Mix)
-
-**Purpose:** Test mixed German/English naming conventions.
-
-```yaml
-center_id: center_04
-name: "Frankfurt Dental Center"
-port: 1436
-schema: dbo
-quality: moderate
-```
-
-**Column Name Variations:**
-
-| Canonical | Center 1 | Center 4 |
-|-----------|----------|----------|
-| patient_id | PATNR | PATIENT_ID |
-| date | DATUM | ENTRY_DATE |
-| chart_note | BEMERKUNG | NOTES |
-| soft_delete | DELKZ | IS_DELETED |
-| insurance_type | ART | TYPE |
-
-**Expected Results:**
-- System handles English column names
-- Value bank matching still works (German insurance names)
-- Confidence slightly lower due to name/value language mismatch
-
----
-
-### Center 5: Cologne (Data Quality - Abandoned Columns)
-
-**Purpose:** Test abandoned column detection.
-
-```yaml
-center_id: center_05
-name: "Cologne Dental Center"
-port: 1437
-schema: ck
-quality: poor
-```
-
-**Data Quality Issues:**
-
-| Column | Issue | Last Value Date | Detection |
-|--------|-------|-----------------|-----------|
-| KARTEI.OLD_STATUS | Abandoned | 2019-03-15 | Should flag |
-| KARTEI.LEGACY_CODE | Abandoned | 2020-01-01 | Should flag |
-| PATIENT.OLD_ADDRESS | Abandoned | 2018-06-30 | Should flag |
-| BEHANDLUNG.V1_FLAG | Abandoned | 2017-12-31 | Should flag |
-
-**Active Columns with Old Data (Should NOT flag):**
-
-| Column | Data Range | Recent Values | Detection |
-|--------|------------|---------------|-----------|
-| KASSEN.GRUENDUNG | 1990-2023 | Yes (new insurances added) | Should NOT flag |
-
-**Expected Results:**
-- 4 columns flagged as abandoned
-- Threshold test: 24 months cutoff works correctly
-- Active columns with old data not falsely flagged
-
----
-
-### Center 6: Düsseldorf (Data Quality - Empty & Mostly Empty)
-
-**Purpose:** Test empty and mostly-empty column detection.
-
-```yaml
-center_id: center_06
-name: "Düsseldorf Dental Center"
-port: 1438
-schema: ck
-quality: poor
-```
-
-**Data Quality Issues:**
-
-| Column | NULL % | Expected Label | Notes |
-|--------|--------|----------------|-------|
-| PATIENT.FAX | 100% | empty | Auto-exclude |
-| PATIENT.TELEX | 100% | empty | Auto-exclude |
-| KARTEI.UNUSED_1 | 100% | empty | Auto-exclude |
-| PATIENT.MOBILE | 97% | mostly_empty | Flag for review |
-| PATIENT.EMAIL | 96% | mostly_empty | Flag for review |
-| PATIENT.EMERGENCY | 94% | (valid) | Should NOT flag (below 95%) |
-| KARTEI.OPTIONAL_NOTE | 80% | (valid) | Should NOT flag |
-
-**Threshold Edge Cases:**
-
-| Column | NULL % | Expected |
-|--------|--------|----------|
-| TEST_94 | 94.0% | NOT flagged |
-| TEST_95 | 95.0% | Flagged (at threshold) |
-| TEST_96 | 96.0% | Flagged |
-
-**Expected Results:**
-- 3 columns auto-excluded (100% empty)
-- 2 columns flagged for review (95-99% empty)
-- Threshold boundary tested precisely
-
----
-
-### Center 7: Stuttgart (Data Quality - Misused & Test Data)
-
-**Purpose:** Test misused column and test data detection.
-
-```yaml
-center_id: center_07
-name: "Stuttgart Dental Center"
-port: 1439
-schema: ck
-quality: poor
-```
-
-**Misused Columns:**
-
-| Column | Name Suggests | Actual Content | Mismatch % |
-|--------|---------------|----------------|------------|
-| KARTEI.DATUM | Date | Mix of dates + "cancelled", "pending" | 35% |
-| PATIENT.PHONE | Phone | Mix of phones + "no phone", "call later" | 28% |
-| BEHANDLUNG.PREIS | Price/Number | Mix of numbers + "TBD", "free" | 40% |
-
-**Test Data Columns:**
-
-| Column | Values | Pattern |
-|--------|--------|---------|
-| KARTEI.DEBUG_FLAG | "TEST", "XXX", "DEBUG" | test_pattern |
-| PATIENT.TEST_COL | "DUMMY", "ASDF", "12345" | test_pattern |
-| BEHANDLUNG.DEV_NOTE | "TODO", "FIXME", "TEST" | test_pattern |
-
-**Expected Results:**
-- 3 columns flagged as misused (type mismatch >30%)
-- 3 columns flagged as test_only
-- System learns to exclude test patterns
-
----
-
-### Center 8: Leipzig (Threshold Edge Cases)
+### Center 1: Pathological (Threshold Edge Cases)
 
 **Purpose:** Test exact threshold boundaries for all detection types.
 
 ```yaml
-center_id: center_08
-name: "Leipzig Dental Center"
-port: 1440
+center_id: center_01
+name: "Pathological Edge Cases"
+port: 1433
 schema: test
 quality: synthetic
+type: possibilities
 ```
 
-**Synthetic Threshold Tests:**
+**Threshold Boundary Tests:**
 
 | Test | Column | Value | Expected Result |
 |------|--------|-------|-----------------|
-| Empty threshold | EMPTY_100 | 100% NULL | auto_excluded |
-| Empty threshold | EMPTY_99 | 99% NULL | mostly_empty (flagged) |
+| Empty at 100% | EMPTY_100 | 100% NULL | auto_excluded |
+| Empty below | EMPTY_99 | 99% NULL | mostly_empty (flagged) |
 | Mostly empty below | NULL_94 | 94% NULL | NOT flagged |
 | Mostly empty at | NULL_95 | 95% NULL | flagged |
 | Mostly empty above | NULL_96 | 96% NULL | flagged |
@@ -397,80 +109,88 @@ quality: synthetic
 | Test data at | TEST_80 | 80% test patterns | flagged |
 | Test data above | TEST_81 | 81% test patterns | flagged |
 
+**Extreme Value Tests:**
+
+| Column | Test | Expected |
+|--------|------|----------|
+| SINGLE_VALUE | 100% identical values | Flag as constant |
+| MAX_LENGTH_NAME | 128-char column name | Handle gracefully |
+| UNICODE_VALUES | Full Unicode spectrum | No encoding errors |
+| EMPTY_STRING_COL | All values = '' | Distinct from NULL |
+| ZERO_ROWS_TABLE | Table with 0 rows | Handle gracefully |
+
 **Expected Results:**
 - All threshold boundaries correctly identified
+- System doesn't crash on edge cases
 - Useful for regression testing
-- Documents exact system behavior
+- Auto-match rate: ~20% (most are synthetic test columns)
 
 ---
 
-### Center 9: Zurich (Realistic Messy - Swiss Practice)
+### Center 2: Adversarial (Hostile Naming)
 
-**Purpose:** Realistic messy database combining multiple issues.
+**Purpose:** Test system resilience against malformed, hostile, or unexpected naming patterns.
 
 ```yaml
-center_id: center_09
-name: "Zurich Dental Clinic"
-port: 1441
-schema: praxis
-quality: messy
-language: german_swiss
+center_id: center_02
+name: "Adversarial Naming"
+port: 1434
+schema: dbo
+quality: synthetic
+type: possibilities
 ```
 
-**Characteristics:**
-- Swiss German variations in data
-- Mix of German, French column names (Swiss multilingual)
-- 15% abandoned columns
-- 10% empty columns
-- 5% misused columns
-- Some test data mixed in
-- Different insurance system (Swiss insurances)
+**Adversarial Column Names:**
 
-**Schema Variations:**
+| Category | Examples | Expected Behavior |
+|----------|----------|-------------------|
+| SQL Injection | `SELECT`, `DROP`, `'; DELETE FROM` | Escaped, no execution |
+| Unicode | `Ärztëdätën`, `患者ID`, `αβγ` | Handled correctly |
+| Special Characters | `col#1`, `data@2023`, `name\tstuff` | Escaped properly |
+| Reserved Keywords | `SELECT`, `FROM`, `WHERE`, `NULL` | Quoted, no conflicts |
+| Empty/Whitespace | ` `, `\t`, `col name` | Flagged as invalid |
+| Very Long | 128+ character names | Truncated/flagged |
+| Numeric Start | `123column`, `1st_name` | Handled correctly |
+| Similar Names | `PATNR`, `PAT_NR`, `PATNR2` | Distinguished correctly |
 
-| Canonical | Swiss Name | Notes |
-|-----------|------------|-------|
-| patient_id | PATIENT_NR | Standard |
-| insurance_name | KRANKENKASSE | Swiss term |
-| insurance_type | VERSICHERUNGSART | Different values (Grundversicherung, Zusatz) |
+**Adversarial Data Values:**
 
-**Swiss Insurance Values:**
-- "CSS Versicherung"
-- "Helsana"
-- "Swica"
-- "Concordia"
-- "Visana"
+| Column | Hostile Values | Expected |
+|--------|---------------|----------|
+| PATIENT_NAME | `<script>alert('xss')</script>` | Sanitized |
+| NOTES | `'; DROP TABLE patients; --` | Not executed |
+| DATE_COL | `9999-99-99`, `-1`, `tomorrow` | Validation fails |
+| AMOUNT | `1e308`, `NaN`, `Infinity` | Handled gracefully |
 
 **Expected Results:**
-- System handles Swiss variations
-- Value bank learns Swiss insurance names
-- Lower auto-match rate due to complexity (~70%)
-- Higher review queue (~150 items)
+- No SQL injection vulnerabilities
+- No crashes on hostile input
+- All columns flagged for manual review
+- Auto-match rate: ~10% (adversarial naming defeats matching)
 
 ---
 
-### Center 10: Vienna (Realistic Messy - Austrian Practice)
+## ZONE B: REALISTIC EXTREMES (Observed Worst Cases)
 
-**Purpose:** Final stress test with Austrian variations and maximum complexity.
+**Purpose:** Handle patterns observed in actual messy databases. These are real scenarios we've encountered.
+
+---
+
+### Center 3: Vienna (Legacy Chaos - Austrian)
+
+**Purpose:** Maximum complexity observed in real legacy systems. Based on actual Austrian dental practice migration.
 
 ```yaml
-center_id: center_10
+center_id: center_03
 name: "Vienna Dental Practice"
-port: 1442
+port: 1435
 schema: ordination
 quality: messy
 language: german_austrian
+type: realities
 ```
 
-**Characteristics:**
-- Austrian German variations
-- Legacy system migration artifacts
-- Multiple soft-delete conventions in same DB
-- Duplicate columns (old and new versions)
-- Some columns with mixed encodings
-- Austrian insurance system
-
-**Maximum Complexity:**
+**Observed Issues (Realistic):**
 
 | Issue Type | Count | Examples |
 |------------|-------|----------|
@@ -478,102 +198,402 @@ language: german_austrian
 | Empty columns | 15 | Never-used fields |
 | Mostly empty | 10 | Rarely-used optional fields |
 | Misused | 8 | Date fields with text |
-| Test data | 5 | Debug columns |
+| Test data | 5 | Debug columns left in production |
 | Duplicate (old/new) | 6 | ADDR_OLD, ADDR_NEW pairs |
 | Encoding issues | 3 | Mixed UTF-8/Latin-1 |
 
+**Schema Complexity:**
+- Multiple soft-delete conventions in same DB (`DELETED`, `DELKZ`, `IS_REMOVED`)
+- Duplicate columns for same concept (migration artifacts)
+- Mixed encodings causing garbled umlauts
+
 **Austrian Insurance Values:**
-- "Österreichische Gesundheitskasse (ÖGK)"
-- "BVAEB"
-- "SVS"
-- "Wiener Städtische"
-- "Uniqa"
+```python
+austrian_insurances = [
+    "Österreichische Gesundheitskasse (ÖGK)",
+    "BVAEB",
+    "SVS",
+    "Wiener Städtische",
+    "Uniqa",
+]
+```
 
 **Expected Results:**
-- Lowest auto-match rate (~60%)
-- Largest review queue (~200 items)
-- Most excluded columns (~70)
-- Tests system at realistic worst-case
+- Auto-match rate: ~55%
+- Review queue: ~200 items
+- Excluded columns: ~70
 - Demonstrates value of human-in-the-loop
 
 ---
 
-## Data Generation Specifications
+### Center 4: Zurich (Data Type Disasters - Swiss)
 
-### Row Counts per Center
+**Purpose:** Test handling of severe data type mismatches and format inconsistencies.
 
-| Table | Rows | Notes |
-|-------|------|-------|
-| PATIENT | 500-2,000 | Varies by center size |
-| KARTEI | 5,000-20,000 | ~10 entries per patient |
-| KASSEN | 30-80 | German/Swiss/Austrian insurances |
-| PATKASSE | 600-2,500 | ~1.2 insurances per patient |
-| LEISTUNG | 200-500 | Dental procedure catalog |
-| BEHANDLUNG | 3,000-15,000 | Treatment records |
-
-### Date Ranges
-
-| Center | Data Start | Data End | Notes |
-|--------|------------|----------|-------|
-| 1-4 | 2018-01-01 | Present | Normal range |
-| 5-6 | 2015-01-01 | Present | Includes abandoned columns |
-| 7-8 | 2010-01-01 | Present | Wide range for testing |
-| 9-10 | 2012-01-01 | Present | Realistic messy |
-
-### Value Generation Rules
-
-**Patient Names:**
-```python
-# German name generator
-first_names = ["Hans", "Klaus", "Peter", "Maria", "Anna", "Sophie", ...]
-last_names = ["Müller", "Schmidt", "Schneider", "Fischer", "Weber", ...]
+```yaml
+center_id: center_04
+name: "Zurich Dental Clinic"
+port: 1436
+schema: praxis
+quality: messy
+language: german_swiss
+type: realities
 ```
 
-**Insurance Names:**
-```python
-german_insurances = [
-    "DAK Gesundheit",
-    "AOK Bayern",
-    "AOK Baden-Württemberg",
-    "BARMER",
-    "Techniker Krankenkasse",
-    "IKK classic",
-    "KKH",
-    "hkk",
-    "Debeka",
-    "Allianz Private",
-    # ... 70+ real German insurances
-]
+**Data Type Disasters:**
 
+| Column | Name Suggests | Actual Content | Issue |
+|--------|---------------|----------------|-------|
+| GEBDAT | Date (birth) | VARCHAR(8) `YYYYMMDD` | Wrong type |
+| AKTIV | Boolean | CHAR(1) `J`/`N` | German boolean |
+| PREIS | Decimal | VARCHAR with `CHF 150.00` | Currency in string |
+| PATIENT_FK | Integer FK | VARCHAR `PAT-00123` | String FK |
+| TELEFON | Phone | Mix of formats | Inconsistent |
+| TIMESTAMP | DateTime | Unix epoch as VARCHAR | Wrong type |
+
+**Misused Columns (Observed):**
+
+| Column | Expected Type | Actual Content | Mismatch % |
+|--------|---------------|----------------|------------|
+| DATUM | Date | Mix of dates + "cancelled", "pending" | 35% |
+| TELEFON | Phone | Mix of phones + "no phone", "call back" | 28% |
+| BETRAG | Decimal | Mix of numbers + "TBD", "gratis" | 40% |
+
+**Swiss Variations:**
+- Different insurance terminology (Krankenkasse vs Versicherung)
+- French column names mixed with German
+- Different date formats (DD.MM.YYYY common)
+
+**Swiss Insurance Values:**
+```python
 swiss_insurances = [
     "CSS Versicherung",
     "Helsana",
     "Swica",
     "Concordia",
     "Visana",
-    # ... Swiss insurances
-]
-
-austrian_insurances = [
-    "Österreichische Gesundheitskasse (ÖGK)",
-    "BVAEB",
-    "SVS",
-    # ... Austrian insurances
 ]
 ```
 
-**Date Formats:**
-```python
-# Center 1-8: Standard YYYYMMDD
-date_format = "%Y%m%d"  # "20220118"
+**Expected Results:**
+- Auto-match rate: ~60%
+- High type mismatch flags
+- Demonstrates type detection value
+- Review queue: ~150 items
 
-# Center 9-10: Mixed formats (realistic mess)
-date_formats = [
-    "%Y%m%d",      # "20220118"
-    "%d.%m.%Y",    # "18.01.2022"
-    "%Y-%m-%d",    # "2022-01-18"
-]
+---
+
+## ZONE C: MODERATE VARIATIONS (Common Realities)
+
+**Purpose:** Test adaptability to normal variance encountered in typical databases.
+
+---
+
+### Center 5: Hamburg (German Naming Variations)
+
+**Purpose:** Test cross-database learning with standard German column name variations.
+
+```yaml
+center_id: center_05
+name: "Hamburg Dental Center"
+port: 1437
+schema: dental
+quality: moderate
+language: german
+type: realities
 ```
+
+**Column Name Variations (Common):**
+
+| Canonical | Standard | Hamburg Variant |
+|-----------|----------|-----------------|
+| patient_id | PATNR | PATIENT_NR |
+| date | DATUM | EINTRAG_DATUM |
+| chart_note | BEMERKUNG | NOTIZ |
+| soft_delete | DELKZ | GELOESCHT |
+| insurance_name | BEZEICHNUNG | KASSEN_NAME |
+| birth_date | GEBDAT | GEBURTSDATUM |
+
+**Compound German Names:**
+
+| Column | Meaning |
+|--------|---------|
+| PATIENTENSTAMMDATEN | Patient master data |
+| BEHANDLUNGSHISTORIE | Treatment history |
+| VERSICHERUNGSNUMMER | Insurance number |
+| ZAHLUNGSEINGANG | Payment receipt |
+
+**Expected Results:**
+- LLM correctly classifies German compound names
+- After verification, new names added to value bank
+- Auto-match rate: ~80%
+- Review queue: ~80 items
+
+---
+
+### Center 6: Frankfurt (Mixed German/English)
+
+**Purpose:** Test mixed language naming conventions (modernized practice).
+
+```yaml
+center_id: center_06
+name: "Frankfurt Dental Center"
+port: 1438
+schema: dbo
+quality: moderate
+language: mixed
+type: realities
+```
+
+**Mixed Naming Convention:**
+
+| Canonical | German (old) | English (new) | Frankfurt (mixed) |
+|-----------|--------------|---------------|-------------------|
+| patient_id | PATNR | PATIENT_ID | patient_id |
+| date | DATUM | ENTRY_DATE | entry_date |
+| chart_note | BEMERKUNG | NOTES | notes |
+| soft_delete | DELKZ | IS_DELETED | is_deleted |
+| insurance_type | ART | TYPE | type |
+
+**Partial Modernization Patterns:**
+- Old tables use German naming (KARTEI, PATIENT)
+- New tables use English naming (appointments, billing)
+- Some tables have mixed column names
+
+**Expected Results:**
+- System handles English column names
+- Value bank matching still works (German insurance names in English-named columns)
+- Auto-match rate: ~78%
+- Slight confidence drop due to name/value language mismatch
+
+---
+
+### Center 7: Cologne (Data Quality - Abandoned & Empty)
+
+**Purpose:** Test abandoned column and empty column detection with clear-cut cases.
+
+```yaml
+center_id: center_07
+name: "Cologne Dental Center"
+port: 1439
+schema: ck
+quality: poor
+type: realities
+```
+
+**Abandoned Columns (Clear Cases):**
+
+| Column | Last Value Date | Months Ago | Detection |
+|--------|-----------------|------------|-----------|
+| KARTEI.OLD_STATUS | 2022-01-15 | 36 | Should flag |
+| KARTEI.LEGACY_CODE | 2022-06-01 | 31 | Should flag |
+| PATIENT.OLD_ADDRESS | 2021-06-30 | 43 | Should flag |
+| BEHANDLUNG.V1_FLAG | 2020-12-31 | 49 | Should flag |
+
+**Active Columns with Old Data (Should NOT flag):**
+
+| Column | Data Range | Recent Values | Detection |
+|--------|------------|---------------|-----------|
+| KASSEN.GRUENDUNG | 1990-2024 | Yes (new insurances) | NOT flagged |
+| PATIENT.GEBDAT | 1920-2024 | Yes (births) | NOT flagged |
+
+**Empty & Mostly Empty:**
+
+| Column | NULL % | Expected Label |
+|--------|--------|----------------|
+| PATIENT.FAX | 100% | empty (auto-exclude) |
+| PATIENT.TELEX | 100% | empty (auto-exclude) |
+| KARTEI.UNUSED_1 | 100% | empty (auto-exclude) |
+| PATIENT.MOBILE | 92% | valid (below threshold) |
+| PATIENT.EMAIL | 88% | valid (below threshold) |
+
+**Expected Results:**
+- 4 columns flagged as abandoned
+- 3 columns auto-excluded (100% empty)
+- No false positives on old-but-active data
+- Auto-match rate: ~75%
+
+---
+
+## ZONE D: CLEAN BASELINES (Ideal State)
+
+**Purpose:** Establish ground truth and verify no false positives. If these fail, something is seriously wrong.
+
+---
+
+### Center 8: Munich (Reference Implementation)
+
+**Purpose:** Canonical Ivoris schema with perfect data. The gold standard.
+
+```yaml
+center_id: center_08
+name: "Munich Dental Center"
+port: 1440
+schema: ck
+quality: clean
+type: realities
+```
+
+**Schema (Ivoris Standard):**
+
+| Table | Description | Key Columns |
+|-------|-------------|-------------|
+| PATIENT | Patient master | PATNR (PK), NAME, VORNAME, GEBDAT |
+| KARTEI | Chart entries | KARESSION (PK), PATNR (FK), DATUM, BEMERKUNG, DELKZ |
+| KASSEN | Insurance companies | KASESSION (PK), BEZEICHNUNG, ART |
+| PATKASSE | Patient-Insurance link | PATNR (FK), KASESSION (FK), GUELTIG_AB |
+| LEISTUNG | Services/Procedures | LEISESSION (PK), BEZEICHNUNG, GEBUEHR |
+| BEHANDLUNG | Treatments | BEHSESSION (PK), PATNR (FK), DATUM, LEISESSION (FK) |
+
+**Data Characteristics:**
+- 1,500 patients
+- 20,000 chart entries
+- 50 insurance companies (German)
+- Clean date formats (YYYYMMDD)
+- No abandoned columns
+- <5% NULL in optional fields
+- Standard German column names
+
+**Expected Results:**
+- Auto-match rate: **95%+**
+- Review queue: <30 items
+- Excluded columns: <5
+- Zero false positives
+
+---
+
+### Center 9: Berlin (Clean + Volume)
+
+**Purpose:** Same quality as Munich but with high volume. Tests performance, not correctness.
+
+```yaml
+center_id: center_09
+name: "Berlin Dental Center"
+port: 1441
+schema: ck
+quality: clean
+type: realities
+```
+
+**Volume:**
+- 10,000 patients (10x Munich)
+- 150,000 chart entries
+- 80 insurance companies
+
+**Same Schema as Munich, Testing:**
+- Profiling performance at scale
+- Sample value selection accuracy
+- Query timeout handling
+- Memory usage during analysis
+
+**Expected Results:**
+- Auto-match rate: **96%+** (benefits from Munich learning)
+- Review queue: <25 items
+- Performance: Complete profiling in <2 minutes
+- Cross-DB learning demonstrated
+
+---
+
+### Center 10: Stuttgart (Minimal Viable)
+
+**Purpose:** Minimum required tables/columns. Tests handling of sparse but valid data.
+
+```yaml
+center_id: center_10
+name: "Stuttgart Dental Center"
+port: 1442
+schema: minimal
+quality: clean
+type: realities
+```
+
+**Minimal Schema:**
+
+| Table | Columns | Rows |
+|-------|---------|------|
+| PATIENT | PATNR, NAME, VORNAME | 100 |
+| KARTEI | KARESSION, PATNR, DATUM, BEMERKUNG | 500 |
+| KASSEN | KASESSION, BEZEICHNUNG | 10 |
+
+**Testing:**
+- No optional columns
+- Minimum viable data
+- System works without "nice to have" fields
+- New practice onboarding scenario
+
+**Expected Results:**
+- Auto-match rate: **98%** (only essential columns)
+- Review queue: <10 items
+- Demonstrates quick onboarding for simple practices
+- Zero complexity
+
+---
+
+## Ground Truth Manifest Format
+
+Every simulated database has a companion YAML file defining expected results.
+
+```yaml
+# ground_truth/center_01_pathological.yml
+
+center:
+  id: "center_01"
+  name: "Pathological Edge Cases"
+  zone: "A"
+  type: "synthetic"
+  purpose: "threshold_testing"
+
+expected_detections:
+  # Threshold boundary tests
+  NULL_94:
+    expected_flag: false
+    actual_null_pct: 94.0
+    note: "Below 95% threshold"
+  NULL_95:
+    expected_flag: true
+    flag_type: "mostly_empty"
+    actual_null_pct: 95.0
+    note: "At threshold"
+  NULL_96:
+    expected_flag: true
+    flag_type: "mostly_empty"
+    actual_null_pct: 96.0
+    note: "Above threshold"
+
+  OLD_24M:
+    expected_flag: true
+    flag_type: "abandoned"
+    last_value_months: 24
+    note: "At 24-month threshold"
+
+  MISMATCH_30:
+    expected_flag: true
+    flag_type: "misused"
+    mismatch_pct: 30.0
+    note: "At 30% threshold"
+
+validation_rules:
+  - name: "threshold_precision"
+    description: "All threshold boundaries must be exact"
+    tolerance: 0.1%
+
+statistics:
+  total_columns: 50
+  expected_flags: 25
+  expected_auto_exclude: 5
+  expected_auto_match_rate: "20%"
+```
+
+---
+
+## Validation Strategy by Zone
+
+| Zone | Pass Criteria | Failure Response |
+|------|--------------|------------------|
+| **A (Synthetic)** | Correctly flags/rejects extremes, no crashes | Bug in detection logic or error handling |
+| **B (Realistic Extreme)** | Handles gracefully, appropriate review flags | Improve edge case handling |
+| **C (Variations)** | Auto-matches with reasonable confidence | Expand value banks, improve LLM prompts |
+| **D (Clean)** | 95%+ auto-match, zero false positives | **SERIOUS REGRESSION** - stop and investigate |
 
 ---
 
@@ -585,10 +605,14 @@ date_formats = [
 version: '3.8'
 
 services:
-  # Center 1: Munich (Baseline)
-  center_01_munich:
+  # ══════════════════════════════════════════════════════════════════════
+  # ZONE A: SYNTHETIC EXTREMES
+  # ══════════════════════════════════════════════════════════════════════
+
+  # Center 1: Pathological Edge Cases
+  center_01_pathological:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_munich
+    container_name: schema_sim_pathological
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -604,10 +628,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Center 2: Berlin
-  center_02_berlin:
+  # Center 2: Adversarial Naming
+  center_02_adversarial:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_berlin
+    container_name: schema_sim_adversarial
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -618,10 +642,14 @@ services:
       - ./data/center_02:/var/opt/mssql/data
       - ./scripts/center_02:/docker-entrypoint-initdb.d
 
-  # Center 3: Hamburg
-  center_03_hamburg:
+  # ══════════════════════════════════════════════════════════════════════
+  # ZONE B: REALISTIC EXTREMES
+  # ══════════════════════════════════════════════════════════════════════
+
+  # Center 3: Vienna (Legacy Chaos)
+  center_03_vienna:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_hamburg
+    container_name: schema_sim_vienna
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -632,10 +660,10 @@ services:
       - ./data/center_03:/var/opt/mssql/data
       - ./scripts/center_03:/docker-entrypoint-initdb.d
 
-  # Center 4: Frankfurt
-  center_04_frankfurt:
+  # Center 4: Zurich (Data Type Disasters)
+  center_04_zurich:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_frankfurt
+    container_name: schema_sim_zurich
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -646,10 +674,14 @@ services:
       - ./data/center_04:/var/opt/mssql/data
       - ./scripts/center_04:/docker-entrypoint-initdb.d
 
-  # Center 5: Cologne
-  center_05_cologne:
+  # ══════════════════════════════════════════════════════════════════════
+  # ZONE C: MODERATE VARIATIONS
+  # ══════════════════════════════════════════════════════════════════════
+
+  # Center 5: Hamburg (German Naming Variations)
+  center_05_hamburg:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_cologne
+    container_name: schema_sim_hamburg
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -660,10 +692,10 @@ services:
       - ./data/center_05:/var/opt/mssql/data
       - ./scripts/center_05:/docker-entrypoint-initdb.d
 
-  # Center 6: Düsseldorf
-  center_06_dusseldorf:
+  # Center 6: Frankfurt (Mixed German/English)
+  center_06_frankfurt:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_dusseldorf
+    container_name: schema_sim_frankfurt
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -674,10 +706,10 @@ services:
       - ./data/center_06:/var/opt/mssql/data
       - ./scripts/center_06:/docker-entrypoint-initdb.d
 
-  # Center 7: Stuttgart
-  center_07_stuttgart:
+  # Center 7: Cologne (Abandoned & Empty)
+  center_07_cologne:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_stuttgart
+    container_name: schema_sim_cologne
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -688,10 +720,14 @@ services:
       - ./data/center_07:/var/opt/mssql/data
       - ./scripts/center_07:/docker-entrypoint-initdb.d
 
-  # Center 8: Leipzig
-  center_08_leipzig:
+  # ══════════════════════════════════════════════════════════════════════
+  # ZONE D: CLEAN BASELINES
+  # ══════════════════════════════════════════════════════════════════════
+
+  # Center 8: Munich (Reference Implementation)
+  center_08_munich:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_leipzig
+    container_name: schema_sim_munich
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -702,10 +738,10 @@ services:
       - ./data/center_08:/var/opt/mssql/data
       - ./scripts/center_08:/docker-entrypoint-initdb.d
 
-  # Center 9: Zurich (Swiss)
-  center_09_zurich:
+  # Center 9: Berlin (Clean + Volume)
+  center_09_berlin:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_zurich
+    container_name: schema_sim_berlin
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -716,10 +752,10 @@ services:
       - ./data/center_09:/var/opt/mssql/data
       - ./scripts/center_09:/docker-entrypoint-initdb.d
 
-  # Center 10: Vienna (Austrian)
-  center_10_vienna:
+  # Center 10: Stuttgart (Minimal Viable)
+  center_10_stuttgart:
     image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: schema_sim_vienna
+    container_name: schema_sim_stuttgart
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=SimTest123!
@@ -745,41 +781,47 @@ simulator/
 ├── README.md                          # Quick start guide
 │
 ├── ground_truth/                      # Expected results for validation
-│   ├── center_01_munich.yml
-│   ├── center_02_berlin.yml
-│   ├── center_03_hamburg.yml
-│   ├── center_04_frankfurt.yml
-│   ├── center_05_cologne.yml
-│   ├── center_06_dusseldorf.yml
-│   ├── center_07_stuttgart.yml
-│   ├── center_08_leipzig.yml
-│   ├── center_09_zurich.yml
-│   └── center_10_vienna.yml
+│   ├── center_01_pathological.yml     # Zone A
+│   ├── center_02_adversarial.yml      # Zone A
+│   ├── center_03_vienna.yml           # Zone B
+│   ├── center_04_zurich.yml           # Zone B
+│   ├── center_05_hamburg.yml          # Zone C
+│   ├── center_06_frankfurt.yml        # Zone C
+│   ├── center_07_cologne.yml          # Zone C
+│   ├── center_08_munich.yml           # Zone D
+│   ├── center_09_berlin.yml           # Zone D
+│   └── center_10_stuttgart.yml        # Zone D
 │
 ├── scripts/                           # SQL initialization scripts
-│   ├── center_01/
+│   ├── center_01/                     # Pathological
 │   │   ├── 01_create_schema.sql
 │   │   ├── 02_create_tables.sql
-│   │   └── 03_insert_data.sql
-│   ├── center_02/
+│   │   └── 03_insert_threshold_data.sql
+│   ├── center_02/                     # Adversarial
 │   │   └── ...
 │   └── .../
 │
 ├── generators/                        # Python data generators
 │   ├── __init__.py
 │   ├── base.py                       # Base generator class
-│   ├── patients.py                   # Patient data generator
-│   ├── insurances.py                 # Insurance data generator
-│   ├── chart_entries.py              # Chart entry generator
-│   ├── quality_issues.py             # Inject quality issues
-│   └── center_configs/               # Per-center configuration
-│       ├── center_01.py
-│       ├── center_02.py
-│       └── ...
+│   ├── threshold_generator.py        # Zone A: synthetic extremes
+│   ├── chaos_generator.py            # Zone B: realistic mess
+│   ├── variation_generator.py        # Zone C: naming variations
+│   ├── clean_generator.py            # Zone D: baselines
+│   └── center_configs/
+│       ├── zone_a.py
+│       ├── zone_b.py
+│       ├── zone_c.py
+│       └── zone_d.py
 │
 ├── validation/                        # Validation scripts
-│   ├── validate_ground_truth.py      # Compare results to expected
-│   └── generate_report.py            # Generate validation report
+│   ├── validate_ground_truth.py
+│   ├── zone_validators/
+│   │   ├── zone_a_validator.py       # Threshold precision
+│   │   ├── zone_b_validator.py       # Graceful handling
+│   │   ├── zone_c_validator.py       # Adaptability
+│   │   └── zone_d_validator.py       # Accuracy (strictest)
+│   └── generate_report.py
 │
 └── data/                             # Generated data (gitignored)
     ├── center_01/
@@ -789,172 +831,94 @@ simulator/
 
 ---
 
-## Generator Script Example
-
-```python
-# generators/base.py
-
-from dataclasses import dataclass
-from typing import List, Dict, Optional
-import random
-from datetime import datetime, timedelta
-
-@dataclass
-class CenterConfig:
-    center_id: str
-    name: str
-    schema: str
-    language: str
-    quality: str  # clean, moderate, poor, messy
-    patient_count: int
-    date_range_start: datetime
-    column_name_mapping: Dict[str, str]
-    quality_issues: Dict[str, dict]
-
-class DatabaseGenerator:
-    """Generate realistic test database for a center."""
-
-    def __init__(self, config: CenterConfig):
-        self.config = config
-        self.random = random.Random(hash(config.center_id))  # Reproducible
-
-    def generate_sql(self) -> str:
-        """Generate complete SQL script for the center."""
-        sql_parts = [
-            self._generate_schema(),
-            self._generate_tables(),
-            self._generate_patients(),
-            self._generate_insurances(),
-            self._generate_chart_entries(),
-            self._inject_quality_issues(),
-        ]
-        return "\n\n".join(sql_parts)
-
-    def _generate_schema(self) -> str:
-        return f"CREATE SCHEMA [{self.config.schema}];"
-
-    def _generate_tables(self) -> str:
-        # Use column name mapping for this center
-        patient_id_col = self.config.column_name_mapping.get('patient_id', 'PATNR')
-        date_col = self.config.column_name_mapping.get('date', 'DATUM')
-        # ... etc
-
-    def _inject_quality_issues(self) -> str:
-        """Inject configured quality issues into the data."""
-        sql = []
-
-        for column, issue in self.config.quality_issues.items():
-            if issue['type'] == 'abandoned':
-                sql.append(self._make_column_abandoned(column, issue['last_date']))
-            elif issue['type'] == 'empty':
-                sql.append(self._make_column_empty(column))
-            elif issue['type'] == 'mostly_empty':
-                sql.append(self._make_column_mostly_empty(column, issue['null_pct']))
-            elif issue['type'] == 'misused':
-                sql.append(self._inject_misused_values(column, issue['bad_values']))
-            elif issue['type'] == 'test_data':
-                sql.append(self._inject_test_data(column))
-
-        return "\n".join(sql)
-```
-
----
-
 ## Usage
 
-### Start All Centers
+### Run by Zone
 
 ```bash
-# Start all 10 centers
-docker-compose -f docker-compose.simulator.yml up -d
-
-# Wait for all to be healthy
-docker-compose -f docker-compose.simulator.yml ps
-
-# Check specific center
-docker-compose -f docker-compose.simulator.yml logs center_01_munich
-```
-
-### Start Subset for Development
-
-```bash
-# Start only baseline centers
-docker-compose -f docker-compose.simulator.yml up -d center_01_munich center_02_berlin
-
-# Start centers 1-5
+# Start Zone A only (synthetic extremes - robustness testing)
 docker-compose -f docker-compose.simulator.yml up -d \
-  center_01_munich center_02_berlin center_03_hamburg \
-  center_04_frankfurt center_05_cologne
+  center_01_pathological center_02_adversarial
+
+# Start Zone D only (clean baselines - accuracy testing)
+docker-compose -f docker-compose.simulator.yml up -d \
+  center_08_munich center_09_berlin center_10_stuttgart
+
+# Start all
+docker-compose -f docker-compose.simulator.yml up -d
 ```
 
-### Regenerate Data
+### Validate by Zone
 
 ```bash
-# Regenerate all centers
-python -m generators.generate_all
+# Zone A: Must not crash (allow low match rate)
+python -m validation.zone_validators.zone_a_validator --centers 1,2
 
-# Regenerate specific center
-python -m generators.generate_center --center 5
+# Zone D: Must achieve 95%+ match rate
+python -m validation.zone_validators.zone_d_validator --centers 8,9,10
 
-# Regenerate with different seed (different random data)
-python -m generators.generate_all --seed 42
-```
-
-### Validate Results
-
-```bash
-# Run schema matching pipeline on center
-python -m schema_matching.pipeline --center center_01_munich
-
-# Compare results to ground truth
-python -m validation.validate_ground_truth \
-  --center center_01_munich \
-  --results output/center_01_results.json \
-  --ground-truth ground_truth/center_01_munich.yml
-
-# Generate full report
-python -m validation.generate_report --all-centers
+# Full validation
+python -m validation.validate_all --report
 ```
 
 ---
 
-## Expected Demo Flow
+## Expected Demo Flow (Extreme → Normal)
 
-### Demo Script: Progressive Onboarding
+### Demo Script: Proving Robustness
 
-1. **Center 1 (Munich):** Baseline onboarding
-   - Show full pipeline execution
-   - ~90% auto-match
-   - Review queue walkthrough
-   - Final approval
+**1. Start with Zone D (Clean) - Establish Baseline**
+```
+"First, let's see the system working on clean data."
+→ Center 8 (Munich): 95% auto-match
+→ "This is our target quality."
+```
 
-2. **Center 2 (Berlin):** Second client benefit
-   - Show faster onboarding
-   - Higher auto-match rate
-   - "DELETED" column learned
+**2. Show Zone A (Synthetic) - Prove Robustness**
+```
+"Now let's stress-test with pathological cases."
+→ Center 1: Threshold edge cases
+→ "See how it correctly identifies the 95% boundary."
+→ Center 2: Adversarial naming
+→ "No crashes, all flagged for review."
+```
 
-3. **Center 3 (Hamburg):** Naming variations
-   - Show LLM classification of new names
-   - Cross-DB learning in action
+**3. Show Zone B (Realistic Extreme) - Handle Chaos**
+```
+"These are real scenarios from legacy migrations."
+→ Center 3 (Vienna): 55% match, 200 review items
+→ "Human-in-the-loop is essential here."
+```
 
-4. **Center 5 (Cologne):** Data quality issues
-   - Show abandoned column detection
-   - Review queue for flagged columns
+**4. Show Zone C (Variations) - Demonstrate Learning**
+```
+"Watch the system learn from variations."
+→ Center 5 (Hamburg): German naming variations
+→ Center 6 (Frankfurt): Mixed German/English
+→ "Value bank grows with each center."
+```
 
-5. **Center 9 (Zurich):** Realistic complexity
-   - Show system handling messy data
-   - Value bank with Swiss insurances
-   - Human-in-the-loop importance
+**5. Return to Zone D - Show Improvement**
+```
+"After learning from all centers..."
+→ Center 9 (Berlin): 96% match (improved from 95%)
+→ "Cross-DB learning in action."
+```
 
-### Demo Metrics to Show
+### Demo Metrics Progression
 
-| After Center | Learned Column Names | Value Bank Size | Avg Auto-Match |
-|--------------|---------------------|-----------------|----------------|
-| 1 | 15 | 50 | 90% |
-| 2 | 20 | 80 | 92% |
-| 3 | 35 | 100 | 88% |
-| 5 | 40 | 120 | 85% |
-| 9 | 55 | 180 | 82% |
+| Center | Zone | Auto-Match | Review Queue | Learning |
+|--------|------|------------|--------------|----------|
+| 8 Munich | D | 95% | 30 | Baseline |
+| 1 Pathological | A | 20% | 40 | Thresholds |
+| 2 Adversarial | A | 10% | 50 | Security |
+| 3 Vienna | B | 55% | 200 | Chaos handling |
+| 4 Zurich | B | 60% | 150 | Type detection |
+| 5 Hamburg | C | 80% | 80 | German names |
+| 6 Frankfurt | C | 78% | 85 | Mixed languages |
+| 7 Cologne | C | 75% | 90 | Quality detection |
+| 9 Berlin | D | 96% | 25 | **Improved** |
+| 10 Stuttgart | D | 98% | 10 | Minimal case |
 
 ---
 
@@ -963,32 +927,63 @@ python -m validation.generate_report --all-centers
 ```gherkin
 Feature: Database Simulator Validation
 
-  Scenario: Ground truth matches actual structure
-    Given center "center_01_munich" is running
-    When I query the schema structure
-    Then it should match the ground truth manifest
-    And all expected tables should exist
-    And all expected columns should exist
+  # ════════════════════════════════════════════════════════════════
+  # ZONE A: SYNTHETIC EXTREMES
+  # ════════════════════════════════════════════════════════════════
 
-  Scenario: Quality issues are correctly injected
-    Given center "center_06_dusseldorf" is running
-    When I query column "PATIENT.FAX"
-    Then NULL percentage should be exactly 100%
-    When I query column "PATIENT.MOBILE"
-    Then NULL percentage should be exactly 97%
-
-  Scenario: Threshold edge cases are precise
-    Given center "center_08_leipzig" is running
+  Scenario: Threshold boundaries are precise
+    Given center "center_01_pathological" is running
     When I query column "NULL_94"
     Then NULL percentage should be exactly 94.0%
+    And it should NOT be flagged
     When I query column "NULL_95"
     Then NULL percentage should be exactly 95.0%
+    And it should be flagged as "mostly_empty"
 
-  Scenario: Data is reproducible
-    Given center "center_01_munich" is regenerated twice
-    Then both generations should produce identical data
-    And row counts should match
-    And sample values should match
+  Scenario: Adversarial input doesn't crash system
+    Given center "center_02_adversarial" is running
+    When I run schema profiling
+    Then no SQL injection should occur
+    And no unhandled exceptions should be thrown
+    And all columns should be flagged for manual review
+
+  # ════════════════════════════════════════════════════════════════
+  # ZONE B: REALISTIC EXTREMES
+  # ════════════════════════════════════════════════════════════════
+
+  Scenario: Legacy chaos is handled gracefully
+    Given center "center_03_vienna" is running
+    When I run the full pipeline
+    Then auto-match rate should be between 50-65%
+    And review queue should contain 150-250 items
+    And no columns should be incorrectly auto-approved
+
+  # ════════════════════════════════════════════════════════════════
+  # ZONE C: MODERATE VARIATIONS
+  # ════════════════════════════════════════════════════════════════
+
+  Scenario: German naming variations are learned
+    Given center "center_05_hamburg" has been processed
+    When I process center "center_06_frankfurt"
+    Then previously learned column names should match faster
+    And value bank should contain German insurance names
+
+  # ════════════════════════════════════════════════════════════════
+  # ZONE D: CLEAN BASELINES (STRICTEST)
+  # ════════════════════════════════════════════════════════════════
+
+  Scenario: Clean baseline achieves high accuracy
+    Given center "center_08_munich" is running
+    When I run the full pipeline
+    Then auto-match rate should be >= 95%
+    And review queue should contain <= 30 items
+    And there should be ZERO false positives
+
+  Scenario: Cross-DB learning improves results
+    Given center "center_08_munich" has been processed
+    When I process center "center_09_berlin"
+    Then auto-match rate should be >= 96%
+    And processing time should be < center_08 time
 ```
 
 ---
@@ -998,8 +993,10 @@ Feature: Database Simulator Validation
 - [ACCEPTANCE.md](ACCEPTANCE.md) - Feature acceptance criteria
 - [03-value-banks.md](03-value-banks.md) - Value bank and quality detection
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Backend architecture
+- [DISCUSSION_LOG.md](DISCUSSION_LOG.md) - Design decision history
 
 ---
 
 *Created: 2024-01-14*
+*Updated: 2024-01-14 (Extreme → Normal restructure)*
 *Status: Planning*

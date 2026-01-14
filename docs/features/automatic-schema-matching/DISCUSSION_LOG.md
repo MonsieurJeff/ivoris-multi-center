@@ -215,6 +215,45 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 
 ---
 
+### Request 14: Simulation Ordering (Extreme → Normal)
+**User Input:**
+> "Simulations needs to be from extreme to normal. What are the best practices knowing that we have to represent possibilities (potential DB) and realities (actual DB)"
+
+**Discussion:**
+- User requested reversing the simulation order from Normal→Extreme to Extreme→Normal
+- This is the "stress-first" or "boundary testing" approach
+
+**Analysis Provided:**
+
+| Principle | Rationale |
+|-----------|-----------|
+| **Fail Fast** | Discover breaking points before investing in "easy" cases |
+| **Defensive Design** | If it handles chaos, normal is trivial |
+| **Confidence Building** | Passing edge cases = high confidence in robustness |
+| **Regression Priority** | Edge cases break first during refactoring |
+
+**Possibilities vs Realities Framework:**
+
+| Type | Definition | Purpose |
+|------|------------|---------|
+| **Possibilities (Synthetic)** | Constructed worst-case scenarios that *could* exist | Test detection limits, boundary conditions |
+| **Realities (Observed)** | Patterns from actual Ivoris databases | Validate real-world handling |
+
+**Outcome:** Complete restructure of DATABASE_SIMULATOR.md with 4 zones:
+
+| Zone | Centers | Type | Purpose | Expected Auto-Match |
+|------|---------|------|---------|---------------------|
+| **A** | 1-2 | Synthetic Extremes | Break the system | 0-40% |
+| **B** | 3-4 | Realistic Extremes | Handle chaos gracefully | 50-65% |
+| **C** | 5-7 | Moderate Variations | Test adaptability | 75-85% |
+| **D** | 8-10 | Clean Baselines | Verify accuracy | 90-98% |
+
+**Key Insight:**
+- **Possibilities** test the **boundaries** of detection (Zone A)
+- **Realities** test the **accuracy** of matching (Zones B, C, D)
+
+---
+
 ## Design Decisions Summary
 
 | Decision | Rationale |
@@ -226,9 +265,11 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 | Final approval always logged | Audit trail regardless of trust level |
 | Both Blueprint + Directory | Complex feature needs both route and code organization |
 | Models in shared location | DB migrations, cross-feature access |
-| **10 Docker SQL Server centers** | Realistic simulation with progression |
-| **Ground truth manifests** | Enable automated validation |
-| **Threshold edge cases in Center 8** | Regression testing for detection limits |
+| 10 Docker SQL Server centers | Realistic simulation with progression |
+| Ground truth manifests | Enable automated validation |
+| Threshold edge cases in Center 8 | Regression testing for detection limits |
+| **Extreme → Normal ordering** | Stress-first approach: prove robustness before accuracy |
+| **Possibilities vs Realities** | Synthetic extremes test limits, observed patterns test accuracy |
 
 ---
 
