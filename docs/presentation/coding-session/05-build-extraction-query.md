@@ -404,4 +404,4 @@ def save_output(entries: list, target_date: date, format: str = "json"):
 
 ## Next Step
 
-→ [06-cron-setup.md](./06-cron-setup.md) - Automate with cron job
+→ [05b-extraction-script.md](./05b-extraction-script.md) - Create Python script for CSV/JSON output

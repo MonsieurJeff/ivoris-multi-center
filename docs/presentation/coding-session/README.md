@@ -17,9 +17,10 @@ This session walks through building the Daily Extraction Pipeline from scratch, 
 | 3 | [03-explore-database.md](./03-explore-database.md) | ~10 min | Explore tables and columns manually |
 | 4 | [04-find-tables.md](./04-find-tables.md) | ~5 min | Identify the 4 key tables |
 | 5 | [05-build-extraction-query.md](./05-build-extraction-query.md) | ~15 min | Build the JOIN query step by step |
+| 5b | [05b-extraction-script.md](./05b-extraction-script.md) | ~10 min | Create Python script for CSV/JSON output |
 | 6 | [06-cron-setup.md](./06-cron-setup.md) | ~5 min | Automate with cron job |
 
-**Total estimated time:** ~45 minutes
+**Total estimated time:** ~55 minutes
 
 ---
 
