@@ -56,6 +56,58 @@
 | **Possibilities (Synthetic)** | Constructed worst-case scenarios that *could* exist | Test detection limits, boundary conditions | A |
 | **Realities (Observed)** | Patterns from actual Ivoris databases | Validate real-world handling | B, C, D |
 
+### Zone Distribution Best Practices
+
+#### What Drives the Count per Zone?
+
+| Zone | Driver | Question to Ask |
+|------|--------|-----------------|
+| **A** | Threshold coverage | How many boundaries to test? |
+| **B** | Disaster patterns | How many distinct failure modes observed? |
+| **C** | Variation space | How much variance in real naming/data? |
+| **D** | Confidence level | How sure do we need to be? |
+
+#### The Sizing Rules
+
+| Zone | Rule | Rationale |
+|------|------|-----------|
+| **A** | **Fixed at 2** | Synthetic tests are deterministic. One well-designed center covers ALL thresholds. One covers adversarial. Adding more doesn't add value. |
+| **B** | **1 per disaster pattern** | Don't duplicate, enumerate. If you've observed 3 distinct disaster patterns, use 3. |
+| **C** | **Scales with variation space** | This zone feeds value banks. More variety = better learning. Diminishing returns after 5. |
+| **D** | **Minimum 1, maximum 3** | Quality over quantity. If your reference fails, you have a serious bug. |
+
+#### Distribution Options
+
+| Scale | Zone A | Zone B | Zone C | Zone D | Total | Use Case |
+|-------|--------|--------|--------|--------|-------|----------|
+| **Minimum Viable** | 2 | 2 | 2 | 1 | **7** | Quick validation, CI/CD |
+| **Standard** | 2 | 2 | 3 | 3 | **10** | Full testing & demos |
+| **Comprehensive** | 2 | 3-4 | 5-6 | 2-3 | **12-15** | Enterprise, multi-region |
+
+#### Current Distribution (Standard - 10 Centers)
+
+```
+Zone A: 2 centers (20%) ─► Pathological + Adversarial
+Zone B: 2 centers (20%) ─► Vienna + Zurich
+Zone C: 3 centers (30%) ─► Hamburg + Frankfurt + Cologne
+Zone D: 3 centers (30%) ─► Munich + Berlin + Stuttgart
+─────────────────────────
+Total: 10 centers
+```
+
+**Why this distribution works:**
+
+| Zone | Count | Justification |
+|------|-------|---------------|
+| **A = 2** | Fixed | All thresholds in Center 1, all adversarial in Center 2 |
+| **B = 2** | Sufficient | Two distinct disaster patterns: legacy chaos + type disasters |
+| **C = 3** | Good coverage | German naming + mixed languages + quality detection |
+| **D = 3** | Confidence | Reference + volume test + minimal viable |
+
+#### Key Insight
+
+> **Zone C is where learning happens.** If you need to add centers, add them to Zone C (more naming variations, regional insurance differences). Zone A is fixed. Zone B grows only when new disaster patterns are observed. Zone D needs only one perfect reference.
+
 ---
 
 ## The 10 Centers

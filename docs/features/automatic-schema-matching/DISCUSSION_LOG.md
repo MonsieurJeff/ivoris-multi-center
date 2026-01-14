@@ -254,6 +254,37 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 
 ---
 
+### Request 15: Zone Distribution Best Practices
+**User Input:**
+> "Ha great, how many do we need from each zones? best practices?"
+
+**Discussion:**
+- Analyzed what drives the count per zone
+- Provided sizing rules based on boundary testing and equivalence partitioning
+
+**Outcome:** Added "Zone Distribution Best Practices" section to DATABASE_SIMULATOR.md with:
+
+**The Sizing Rules:**
+
+| Zone | Rule | Rationale |
+|------|------|-----------|
+| **A** | Fixed at 2 | Synthetic = deterministic, one covers all thresholds |
+| **B** | 1 per disaster pattern | Don't duplicate, enumerate |
+| **C** | Scales with variation space | Feeds value banks, diminishing returns after 5 |
+| **D** | Minimum 1, maximum 3 | Quality > quantity |
+
+**Distribution Options:**
+
+| Scale | A | B | C | D | Total |
+|-------|---|---|---|---|-------|
+| Minimum Viable | 2 | 2 | 2 | 1 | 7 |
+| Standard | 2 | 2 | 3 | 3 | 10 |
+| Comprehensive | 2 | 3-4 | 5-6 | 2-3 | 12-15 |
+
+**Key insight:** Zone C is where learning happens. Add centers there first.
+
+---
+
 ## Design Decisions Summary
 
 | Decision | Rationale |
@@ -270,6 +301,9 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 | Threshold edge cases in Center 8 | Regression testing for detection limits |
 | **Extreme → Normal ordering** | Stress-first approach: prove robustness before accuracy |
 | **Possibilities vs Realities** | Synthetic extremes test limits, observed patterns test accuracy |
+| **Zone A fixed at 2** | Synthetic tests are deterministic, one covers all thresholds |
+| **Zone C scales with variance** | Learning zone - add centers here first for more value bank coverage |
+| **Standard = 10 centers (2-2-3-3)** | Balanced coverage for testing and demos |
 
 ---
 
