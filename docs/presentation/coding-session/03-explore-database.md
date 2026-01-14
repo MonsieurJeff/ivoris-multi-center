@@ -17,40 +17,37 @@ Discover the database structure without any documentation. This is the real-worl
 
 ```bash
 # Enter SQL Server container
-docker exec -it ivoris-sqlserver /opt/mssql-tools/bin/sqlcmd \
-  -S localhost -U sa -P 'YourStrong@Passw0rd' -d DentalDB
+docker exec -it ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'YourStrong@Passw0rd' -C -d DentalDB
 ```
 
 ---
 
-## List All Databases
+## List All Schemas
+
+> **💬 Talking Points**
+> - "First surprise: tables might not be in the default 'dbo' schema"
+> - "Ivoris uses a custom 'ck' schema"
+> - "Always check schemas first!"
 
 ```sql
-SELECT name FROM sys.databases ORDER BY name;
+SELECT DISTINCT TABLE_SCHEMA
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE'
+ORDER BY TABLE_SCHEMA;
 GO
 ```
 
 **Output:**
 ```
-name
---------------------
-DentalDB
-master
-model
-msdb
-tempdb
+TABLE_SCHEMA
+------------
+ck
+ckexternpu
+dbo
 ```
 
-**Explanation:** `master`, `model`, `msdb`, `tempdb` are system databases. `DentalDB` is our target.
-
----
-
-## Switch to Target Database
-
-```sql
-USE DentalDB;
-GO
-```
+**Key finding:** Most tables are in `ck` schema!
 
 ---
 
@@ -59,322 +56,302 @@ GO
 > - "It's the meta-database - data about your data"
 > - "These queries work on ANY database, memorize them"
 
-## List All Tables
-
-### Simple list
+## Count Tables
 
 ```sql
-SELECT TABLE_NAME
+SELECT TABLE_SCHEMA, COUNT(*) AS table_count
 FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_TYPE = 'BASE TABLE'
+GROUP BY TABLE_SCHEMA
+ORDER BY table_count DESC;
+GO
+```
+
+**Output:**
+```
+TABLE_SCHEMA  table_count
+------------  -----------
+ck            487
+dbo           4
+ckexternpu    1
+```
+
+**487 tables!** We need to find the right ones.
+
+---
+
+## Search for Relevant Tables
+
+```sql
+-- Find tables with promising names
+SELECT TABLE_SCHEMA, TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE'
+  AND (TABLE_NAME LIKE '%KARTEI%'
+    OR TABLE_NAME LIKE '%PATIENT%'
+    OR TABLE_NAME LIKE '%KASSE%'
+    OR TABLE_NAME LIKE '%LEISTUNG%')
 ORDER BY TABLE_NAME;
 GO
 ```
 
-**Output:**
+**Output (truncated):**
 ```
-TABLE_NAME
---------------------
-KARTEI
-KASSE
-LEISTUNG
-PATIENT
-```
-
-### With row counts
-
-```sql
-SELECT
-    t.TABLE_NAME,
-    p.rows AS ROW_COUNT
-FROM INFORMATION_SCHEMA.TABLES t
-JOIN sys.tables st ON t.TABLE_NAME = st.name
-JOIN sys.partitions p ON st.object_id = p.object_id AND p.index_id IN (0, 1)
-WHERE t.TABLE_TYPE = 'BASE TABLE'
-ORDER BY t.TABLE_NAME;
-GO
+TABLE_SCHEMA  TABLE_NAME
+------------  ----------
+ck            KARTEI
+ck            KARTEIABRECHNUNG
+ck            KARTEIABTEILUNG
+...
+ck            KASSEN
+ck            KASSENABSCHLAG
+...
+ck            LEISTUNG
+ck            LEISTUNGVALID
+...
+ck            PATIENT
+ck            PATIENTABTEILUNG
+...
+ck            PATKASSE
 ```
 
-**Output:**
-```
-TABLE_NAME     ROW_COUNT
--------------- ---------
-KARTEI         15
-KASSE          5
-LEISTUNG       20
-PATIENT        10
-```
+**Found our candidates:** `ck.KARTEI`, `ck.PATIENT`, `ck.KASSEN`, `ck.LEISTUNG`, `ck.PATKASSE`
 
 ---
 
-## List All Columns (One Per Line)
-
-### All tables, all columns
-
-```sql
-SELECT
-    TABLE_NAME,
-    COLUMN_NAME,
-    DATA_TYPE,
-    CHARACTER_MAXIMUM_LENGTH,
-    IS_NULLABLE
-FROM INFORMATION_SCHEMA.COLUMNS
-ORDER BY TABLE_NAME, ORDINAL_POSITION;
-GO
-```
-
-**Output:**
-```
-TABLE_NAME  COLUMN_NAME   DATA_TYPE   CHARACTER_MAXIMUM_LENGTH  IS_NULLABLE
-----------  -----------   ---------   ------------------------  -----------
-KARTEI      KARTEIID      int         NULL                      NO
-KARTEI      PATIENTID     int         NULL                      YES
-KARTEI      DATUM         date        NULL                      YES
-KARTEI      EINTRAG       nvarchar    -1                        YES
-KASSE       KASSEID       int         NULL                      NO
-KASSE       NAME          nvarchar    100                       YES
-KASSE       TYP           char        1                         YES
-LEISTUNG    LEISTUNGID    int         NULL                      NO
-LEISTUNG    PATIENTID     int         NULL                      YES
-LEISTUNG    DATUM         date        NULL                      YES
-LEISTUNG    LEISTUNG      nvarchar    20                        YES
-PATIENT     PATIENTID     int         NULL                      NO
-PATIENT     NAME          nvarchar    100                       YES
-PATIENT     VORNAME       nvarchar    100                       YES
-PATIENT     GEBDAT        date        NULL                      YES
-PATIENT     KASSEID       int         NULL                      YES
-```
-
-### Formatted for readability
-
-```sql
-SELECT
-    TABLE_NAME + '.' + COLUMN_NAME + ' (' + DATA_TYPE +
-    CASE
-        WHEN CHARACTER_MAXIMUM_LENGTH IS NOT NULL AND CHARACTER_MAXIMUM_LENGTH > 0
-        THEN '(' + CAST(CHARACTER_MAXIMUM_LENGTH AS VARCHAR) + ')'
-        WHEN CHARACTER_MAXIMUM_LENGTH = -1 THEN '(MAX)'
-        ELSE ''
-    END + ')' AS COLUMN_INFO
-FROM INFORMATION_SCHEMA.COLUMNS
-ORDER BY TABLE_NAME, ORDINAL_POSITION;
-GO
-```
-
-**Output:**
-```
-COLUMN_INFO
------------------------------------------
-KARTEI.KARTEIID (int)
-KARTEI.PATIENTID (int)
-KARTEI.DATUM (date)
-KARTEI.EINTRAG (nvarchar(MAX))
-KASSE.KASSEID (int)
-KASSE.NAME (nvarchar(100))
-KASSE.TYP (char(1))
-LEISTUNG.LEISTUNGID (int)
-LEISTUNG.PATIENTID (int)
-LEISTUNG.DATUM (date)
-LEISTUNG.LEISTUNG (nvarchar(20))
-PATIENT.PATIENTID (int)
-PATIENT.NAME (nvarchar(100))
-PATIENT.VORNAME (nvarchar(100))
-PATIENT.GEBDAT (date)
-PATIENT.KASSEID (int)
-```
-
----
+## Explore Key Tables
 
 > **💬 Talking Points - Exploring Tables**
 > - "Always use TOP or LIMIT when exploring - you don't want 10 million rows"
 > - "Look at real data to understand what each column means"
 > - "KARTEI is 'chart' in German - this is the main table we need"
 
-## Explore Individual Tables
-
 ### Look at KARTEI (Chart entries)
 
 ```sql
-SELECT TOP 5 * FROM KARTEI;
+-- List columns
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'KARTEI'
+ORDER BY ORDINAL_POSITION;
 GO
 ```
 
-**Output:**
+**Key columns found:**
 ```
-KARTEIID  PATIENTID  DATUM       EINTRAG
---------  ---------  ----------  ----------------------------------
-1         1          2022-01-18  Kontrolle, Befund unauffällig
-2         1          2022-01-18  Zahnreinigung durchgeführt
-3         2          2022-01-18  Füllungstherapie Zahn 36
-...
+COLUMN_NAME    DATA_TYPE  LENGTH
+-----------    ---------  ------
+ID             int        NULL
+PATNR          int        NULL      ← Patient reference (not PATIENTID!)
+DATUM          varchar    8         ← Date as YYYYMMDD string!
+BEMERKUNG      varchar    -1        ← Chart entry text (not EINTRAG!)
+DELKZ          bit        NULL      ← Soft delete flag
 ```
-
-### Look at PATIENT
 
 ```sql
-SELECT TOP 5 * FROM PATIENT;
+-- Sample data
+SELECT TOP 5 ID, PATNR, DATUM, LEFT(BEMERKUNG, 50) AS bemerkung
+FROM ck.KARTEI
+WHERE DELKZ = 0 OR DELKZ IS NULL
+ORDER BY DATUM DESC;
 GO
 ```
 
 **Output:**
 ```
-PATIENTID  NAME      VORNAME   GEBDAT      KASSEID
----------  --------  --------  ----------  -------
-1          Müller    Hans      1985-03-15  1
-2          Schmidt   Anna      1990-07-22  2
-3          Weber     Thomas    1978-11-30  3
-...
-```
-
-### Look at KASSE (Insurance)
-
-```sql
-SELECT * FROM KASSE;
-GO
-```
-
-**Output:**
-```
-KASSEID  NAME                   TYP
--------  ---------------------  ---
-1        AOK Bayern             G
-2        DAK Gesundheit         G
-3        Techniker Krankenkasse G
-4        PRIVAT                 P
-5        Debeka                 P
-```
-
-**TYP meaning:**
-- `G` = Gesetzliche Krankenversicherung (GKV) - Public insurance
-- `P` = Private Krankenversicherung (PKV) - Private insurance
-
-### Look at LEISTUNG (Services)
-
-```sql
-SELECT TOP 5 * FROM LEISTUNG;
-GO
-```
-
-**Output:**
-```
-LEISTUNGID  PATIENTID  DATUM       LEISTUNG
-----------  ---------  ----------  --------
-1           1          2022-01-18  01
-2           1          2022-01-18  1040
-3           2          2022-01-18  13b
-4           3          2022-01-18  Ä935
-...
+ID  PATNR  DATUM     bemerkung
+--  -----  --------  --------------------------------------------------
+1   1      20241029
+2   1      20230519  Behandlungsmitteilung (19.05.2023)
+3   1      20220118  Kontrolle,
 ```
 
 ---
 
-> **💬 Talking Points - Keys & Relationships**
-> - "Primary keys tell us how tables are uniquely identified"
-> - "Foreign keys tell us how tables connect to each other"
-> - "This reveals the data model without any documentation"
-
-## Find Primary Keys and Foreign Keys
+### Look at PATIENT
 
 ```sql
--- Primary Keys
-SELECT
-    tc.TABLE_NAME,
-    kcu.COLUMN_NAME AS PRIMARY_KEY
-FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-    ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
-ORDER BY tc.TABLE_NAME;
+SELECT COLUMN_NAME, DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'PATIENT'
+  AND COLUMN_NAME IN ('ID', 'P_NAME', 'P_VORNAME', 'P_GEBOREN', 'DELKZ')
+ORDER BY ORDINAL_POSITION;
+GO
+```
+
+**Key columns:**
+```
+COLUMN_NAME  DATA_TYPE
+-----------  ---------
+ID           int         ← Primary key
+P_NAME       varchar     ← Last name
+P_VORNAME    varchar     ← First name
+P_GEBOREN    varchar     ← Birth date (also VARCHAR!)
+DELKZ        bit         ← Soft delete
+```
+
+---
+
+### Look at KASSEN (Insurance)
+
+```sql
+SELECT COLUMN_NAME, DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'KASSEN'
+  AND COLUMN_NAME IN ('ID', 'NAME', 'ART', 'DELKZ')
+ORDER BY ORDINAL_POSITION;
+GO
+```
+
+**Key columns:**
+```
+COLUMN_NAME  DATA_TYPE
+-----------  ---------
+ID           int         ← Primary key
+NAME         varchar     ← Insurance company name
+ART          char(1)     ← Type code (not TYP!)
+DELKZ        bit         ← Soft delete
+```
+
+```sql
+-- What are the ART values?
+SELECT ART, COUNT(*) as cnt, MIN(NAME) as example
+FROM ck.KASSEN
+GROUP BY ART
+ORDER BY cnt DESC;
 GO
 ```
 
 **Output:**
 ```
-TABLE_NAME  PRIMARY_KEY
-----------  -----------
-KARTEI      KARTEIID
-KASSE       KASSEID
-LEISTUNG    LEISTUNGID
-PATIENT     PATIENTID
+ART  cnt    example
+---  -----  -------
+6    20707  abc BKK
+4    2549   AOK Albstadt
+9    1418   ...
+8    849    BARMER
+P    54     Albingia        ← P = Private insurance!
+...
 ```
 
+**Key insight:** `ART = 'P'` means private insurance, numbers (1-9) are public insurance types.
+
+---
+
+### Look at PATKASSE (Patient-Insurance Link)
+
+> **💬 Talking Points - Junction Table**
+> - "This is a surprise - insurance isn't directly on PATIENT"
+> - "PATKASSE is a junction table linking patients to insurance"
+> - "This allows a patient to have multiple insurance records"
+
 ```sql
--- Foreign Keys
-SELECT
-    fk.name AS FK_NAME,
-    tp.name AS PARENT_TABLE,
-    cp.name AS PARENT_COLUMN,
-    tr.name AS REFERENCED_TABLE,
-    cr.name AS REFERENCED_COLUMN
-FROM sys.foreign_keys fk
-JOIN sys.tables tp ON fk.parent_object_id = tp.object_id
-JOIN sys.tables tr ON fk.referenced_object_id = tr.object_id
-JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
-JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
-JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id;
+SELECT COLUMN_NAME, DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'PATKASSE'
+  AND COLUMN_NAME IN ('ID', 'PATNR', 'KASSENID', 'DELKZ')
+ORDER BY ORDINAL_POSITION;
 GO
 ```
 
-**Output:**
+**Key columns:**
 ```
-FK_NAME              PARENT_TABLE  PARENT_COLUMN  REFERENCED_TABLE  REFERENCED_COLUMN
--------------------  ------------  -------------  ----------------  -----------------
-FK_KARTEI_PATIENT    KARTEI        PATIENTID      PATIENT           PATIENTID
-FK_LEISTUNG_PATIENT  LEISTUNG      PATIENTID      PATIENT           PATIENTID
-FK_PATIENT_KASSE     PATIENT       KASSEID        KASSE             KASSEID
+COLUMN_NAME  DATA_TYPE
+-----------  ---------
+ID           int         ← Primary key
+PATNR        int         ← → PATIENT.ID
+KASSENID     int         ← → KASSEN.ID
+DELKZ        bit         ← Soft delete
+```
+
+---
+
+### Look at LEISTUNG (Services)
+
+```sql
+SELECT COLUMN_NAME, DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'LEISTUNG'
+  AND COLUMN_NAME IN ('ID', 'PATIENTID', 'DATUM', 'LEISTUNG', 'DELKZ')
+ORDER BY ORDINAL_POSITION;
+GO
+```
+
+**Key columns:**
+```
+COLUMN_NAME  DATA_TYPE
+-----------  ---------
+ID           int         ← Primary key
+PATIENTID    int         ← Patient reference (different from KARTEI!)
+DATUM        varchar     ← Date as YYYYMMDD
+LEISTUNG     varchar     ← Service code
+DELKZ        bit         ← Soft delete
 ```
 
 ---
 
 > **💬 Talking Points - ER Diagram**
 > - "This is what we've discovered - PATIENT is the central table"
-> - "Notice how KARTEI and LEISTUNG both link to PATIENT"
-> - "This is how dental software works - everything relates to a patient"
+> - "Notice PATKASSE as a junction table - not a direct link"
+> - "LEISTUNG uses PATIENTID but KARTEI uses PATNR - inconsistent naming!"
 
-## Entity Relationship Diagram (Mental Model)
+## Entity Relationship Diagram (Discovered)
 
 ```
 ┌─────────────┐       ┌─────────────┐
-│   KASSE     │       │  LEISTUNG   │
-│  (Insurance)│       │  (Services) │
+│ ck.KASSEN   │       │ck.LEISTUNG  │
+│ (Insurance) │       │ (Services)  │
 ├─────────────┤       ├─────────────┤
-│ KASSEID (PK)│       │ LEISTUNGID  │
+│ ID (PK)     │       │ ID          │
 │ NAME        │       │ PATIENTID───┼──┐
-│ TYP (G/P)   │       │ DATUM       │  │
+│ ART (P=PKV) │       │ DATUM       │  │
 └──────┬──────┘       │ LEISTUNG    │  │
        │              └─────────────┘  │
-       │ 1:N                           │
+       │ ID                            │
        │                               │
 ┌──────┴──────┐                        │
-│   PATIENT   │◄───────────────────────┘
-├─────────────┤           N:1
-│ PATIENTID(PK)│
-│ NAME        │
-│ VORNAME     │
-│ GEBDAT      │
-│ KASSEID (FK)│
-└──────┬──────┘
-       │ 1:N
-       │
-┌──────┴──────┐
-│   KARTEI    │
-│(Chart Entry)│
-├─────────────┤
-│ KARTEIID    │
-│ PATIENTID(FK)│
-│ DATUM       │
-│ EINTRAG     │
-└─────────────┘
+│ck.PATKASSE  │                        │
+│ (Junction)  │                        │
+├─────────────┤                        │
+│ PATNR ──────┼───┐                    │
+│ KASSENID    │   │                    │
+└─────────────┘   │                    │
+                  │                    │
+┌─────────────────┴────────────────────┘
+│
+│  ┌─────────────┐
+└─►│ ck.PATIENT  │
+   ├─────────────┤
+   │ ID (PK)     │
+   │ P_NAME      │
+   │ P_VORNAME   │
+   └──────┬──────┘
+          │ ID = PATNR
+          │
+   ┌──────┴──────┐
+   │ ck.KARTEI   │
+   │(Chart Entry)│
+   ├─────────────┤
+   │ ID          │
+   │ PATNR (FK)  │
+   │ DATUM       │
+   │ BEMERKUNG   │
+   └─────────────┘
 ```
 
 ---
 
-## Summary
+## Key Discoveries Summary
 
-We discovered:
-- **4 tables**: KARTEI, KASSE, LEISTUNG, PATIENT
-- **Relationships**: PATIENT is central, linked to KASSE, KARTEI, LEISTUNG
-- **Key columns**: PATIENTID, KASSEID, DATUM
+| What we expected | What we found | Difference |
+|------------------|---------------|------------|
+| `dbo` schema | `ck` schema | Different schema! |
+| `PATIENTID` | `PATNR` | Different column name |
+| `EINTRAG` | `BEMERKUNG` | Different column name |
+| `KASSE.TYP` | `KASSEN.ART` | Different table & column |
+| `DATE` type | `VARCHAR(8)` | YYYYMMDD strings |
+| Direct insurance link | `PATKASSE` junction | Extra table! |
+| No soft delete | `DELKZ` flag | Must filter! |
 
 ---
 

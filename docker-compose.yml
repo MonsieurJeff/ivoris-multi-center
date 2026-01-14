@@ -9,14 +9,14 @@ services:
     user: root
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=MultiCenter@2024
+      - SA_PASSWORD=Clinero2026
       - MSSQL_PID=Developer
     ports:
       - "1434:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql/data
     healthcheck:
-      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "MultiCenter@2024" -Q "SELECT 1"
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "Clinero2026" -Q "SELECT 1"
       interval: 10s
       timeout: 5s
       retries: 10

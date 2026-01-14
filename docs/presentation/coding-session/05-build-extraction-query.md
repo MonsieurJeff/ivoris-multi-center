@@ -20,133 +20,166 @@ Build a SQL query that extracts:
 
 > **💬 Talking Points - Step 1**
 > - "Always start simple - just the main table with the core fields"
-> - "We can see 6 rows for this date - that's our baseline"
-> - "Now we'll enrich this data step by step"
+> - "Remember: tables are in `ck` schema, dates are VARCHAR YYYYMMDD"
+> - "We must filter soft-deleted rows with DELKZ"
 
 ### Step 1: Start with KARTEI (base table)
 
 ```sql
 SELECT
     k.DATUM,
-    k.PATIENTID,
-    k.EINTRAG
-FROM KARTEI k
-WHERE k.DATUM = '2022-01-18';
+    k.PATNR,
+    LEFT(k.BEMERKUNG, 50) AS bemerkung
+FROM ck.KARTEI k
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118'
+ORDER BY k.PATNR;
 GO
 ```
 
 **Result:**
 ```
-DATUM       PATIENTID  EINTRAG
-----------  ---------  ----------------------------------
-2022-01-18  1          Kontrolle, Befund unauffällig
-2022-01-18  1          Zahnreinigung durchgeführt
-2022-01-18  2          Füllungstherapie Zahn 36
-2022-01-18  3          Röntgenaufnahme OPG
-2022-01-18  4          Beratung Zahnersatz
-2022-01-18  5          Professionelle Zahnreinigung
+DATUM     PATNR  bemerkung
+--------  -----  --------------------------------------------------
+20220118  1      Kontrolle,
 ```
 
-✅ We have date, patient ID, and chart entry.
+**Note:** Date is stored as `'20220118'` not `'2022-01-18'`!
+
+✅ We have date, patient ID, and chart entry (BEMERKUNG).
 
 ---
 
-### Step 2: Add PATIENT (for insurance link)
+### Step 2: Format the date
+
+> **💬 Talking Points**
+> - "YYYYMMDD needs to be converted to readable format"
+> - "SUBSTRING extracts parts: positions 1-4, 5-6, 7-8"
+> - "This is a common pattern with legacy databases"
 
 ```sql
 SELECT
-    k.DATUM,
-    k.PATIENTID,
-    p.NAME,
-    p.KASSEID,
-    k.EINTRAG
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-WHERE k.DATUM = '2022-01-18';
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    LEFT(k.BEMERKUNG, 50) AS chart_entry
+FROM ck.KARTEI k
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118';
 GO
 ```
 
 **Result:**
 ```
-DATUM       PATIENTID  NAME      KASSEID  EINTRAG
-----------  ---------  --------  -------  ----------------------------------
-2022-01-18  1          Müller    1        Kontrolle, Befund unauffällig
-2022-01-18  1          Müller    1        Zahnreinigung durchgeführt
-2022-01-18  2          Schmidt   2        Füllungstherapie Zahn 36
-...
+date        patient_id  chart_entry
+----------  ----------  --------------------------------------------------
+2022-01-18  1           Kontrolle,
 ```
 
-✅ Now we have the link to insurance (KASSEID).
+✅ Date is now formatted properly.
 
 ---
 
-### Step 3: Add KASSE (for insurance status)
+> **💬 Talking Points - PATKASSE Junction**
+> - "Here's the surprise: insurance isn't on PATIENT directly"
+> - "We need to go through PATKASSE - a junction table"
+> - "This allows patients to have multiple insurance records over time"
+
+### Step 3: Add insurance through PATKASSE junction
 
 ```sql
 SELECT
-    k.DATUM,
-    k.PATIENTID,
-    ka.TYP,
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    pk.KASSENID,
+    LEFT(k.BEMERKUNG, 50) AS chart_entry
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118';
+GO
+```
+
+**Result:**
+```
+date        patient_id  KASSENID  chart_entry
+----------  ----------  --------  --------------------------------------------------
+2022-01-18  1           27813     Kontrolle,
+```
+
+✅ Now we have the link to insurance (KASSENID).
+
+---
+
+### Step 4: Add KASSEN for insurance details
+
+```sql
+SELECT
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    ka.ART,
     ka.NAME AS insurance_name,
-    k.EINTRAG
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-WHERE k.DATUM = '2022-01-18';
+    LEFT(k.BEMERKUNG, 50) AS chart_entry
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118';
 GO
 ```
 
 **Result:**
 ```
-DATUM       PATIENTID  TYP  insurance_name          EINTRAG
-----------  ---------  ---  ----------------------  ----------------------------------
-2022-01-18  1          G    AOK Bayern              Kontrolle, Befund unauffällig
-2022-01-18  1          G    AOK Bayern              Zahnreinigung durchgeführt
-2022-01-18  2          G    DAK Gesundheit          Füllungstherapie Zahn 36
-2022-01-18  3          G    Techniker Krankenkasse  Röntgenaufnahme OPG
-2022-01-18  4          P    PRIVAT                  Beratung Zahnersatz
-2022-01-18  5          G    Barmer                  Professionelle Zahnreinigung
+date        patient_id  ART  insurance_name  chart_entry
+----------  ----------  ---  --------------  --------------------------------------------------
+2022-01-18  1           4    DAK Gesundheit  Kontrolle,
 ```
 
-✅ Now we have insurance type (G/P).
+**Key insight:** ART='4' means GKV (public insurance), not 'G'!
 
 ---
 
 > **💬 Talking Points - CASE Statement**
-> - "The raw data has 'G' and 'P' - that's not user-friendly"
-> - "CASE is SQL's if/else - transforms values inline"
-> - "This is a common pattern for data cleanup"
+> - "The ART column uses codes, not simple G/P values"
+> - "'P' = PKV (private), '1' through '9' = various GKV types"
+> - "CASE transforms these to user-friendly labels"
 
-### Step 4: Transform TYP to readable status
+### Step 5: Transform ART to readable status
 
 ```sql
 SELECT
-    k.DATUM AS date,
-    k.PATIENTID AS patient_id,
-    CASE ka.TYP
-        WHEN 'G' THEN 'GKV'
-        WHEN 'P' THEN 'PKV'
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    CASE
+        WHEN ka.ART = 'P' THEN 'PKV'
+        WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
         ELSE 'Selbstzahler'
     END AS insurance_status,
-    ka.NAME AS insurance_name,
-    k.EINTRAG AS chart_entry
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-WHERE k.DATUM = '2022-01-18';
+    ISNULL(ka.NAME, '') AS insurance_name,
+    LEFT(k.BEMERKUNG, 50) AS chart_entry
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118';
 GO
 ```
 
 **Result:**
 ```
-date        patient_id  insurance_status  insurance_name          chart_entry
-----------  ----------  ----------------  ----------------------  ----------------------------------
-2022-01-18  1           GKV               AOK Bayern              Kontrolle, Befund unauffällig
-2022-01-18  1           GKV               AOK Bayern              Zahnreinigung durchgeführt
-2022-01-18  2           GKV               DAK Gesundheit          Füllungstherapie Zahn 36
-2022-01-18  3           GKV               Techniker Krankenkasse  Röntgenaufnahme OPG
-2022-01-18  4           PKV               PRIVAT                  Beratung Zahnersatz
-2022-01-18  5           GKV               Barmer                  Professionelle Zahnreinigung
+date        patient_id  insurance_status  insurance_name  chart_entry
+----------  ----------  ----------------  --------------  --------------------------------------------------
+2022-01-18  1           GKV               DAK Gesundheit  Kontrolle,
 ```
 
 ✅ Insurance status is now human-readable.
@@ -156,70 +189,75 @@ date        patient_id  insurance_status  insurance_name          chart_entry
 > **💬 Talking Points - Aggregation**
 > - "Here's the tricky part - one visit can have multiple billing codes"
 > - "STRING_AGG combines them into one comma-separated string"
-> - "The subquery is correlated - it runs once per row"
+> - "Watch out: LEISTUNG uses PATIENTID, but KARTEI uses PATNR!"
 
-### Step 5: Add service codes (with aggregation)
+### Step 6: Add service codes (with aggregation)
 
 **Problem:** Multiple services per patient per date. We need to aggregate.
 
 ```sql
--- First, let's see the services
+-- First, let's see the services for this date
 SELECT PATIENTID, DATUM, LEISTUNG
-FROM LEISTUNG
-WHERE DATUM = '2022-01-18'
+FROM ck.LEISTUNG
+WHERE DATUM = '20220118'
+  AND (DELKZ = 0 OR DELKZ IS NULL)
 ORDER BY PATIENTID;
 GO
 ```
 
 **Result:**
 ```
-PATIENTID  DATUM       LEISTUNG
----------  ----------  --------
-1          2022-01-18  01
-1          2022-01-18  1040
-2          2022-01-18  13b
-3          2022-01-18  Ä935
+PATIENTID  DATUM     LEISTUNG
+---------  --------  --------
+
+(0 rows affected)
 ```
+
+**Note:** No active LEISTUNG records for this date (all are soft-deleted with DELKZ=1).
+LEISTUNG uses `PATIENTID`, KARTEI uses `PATNR` - same value, different names!
 
 **Solution:** Use subquery with STRING_AGG()
 
 ```sql
 SELECT
-    k.DATUM AS date,
-    k.PATIENTID AS patient_id,
-    CASE ka.TYP
-        WHEN 'G' THEN 'GKV'
-        WHEN 'P' THEN 'PKV'
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    CASE
+        WHEN ka.ART = 'P' THEN 'PKV'
+        WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
         ELSE 'Selbstzahler'
     END AS insurance_status,
-    ka.NAME AS insurance_name,
-    k.EINTRAG AS chart_entry,
-    (
+    ISNULL(ka.NAME, '') AS insurance_name,
+    LEFT(ISNULL(k.BEMERKUNG, ''), 100) AS chart_entry,
+    ISNULL((
         SELECT STRING_AGG(l.LEISTUNG, ', ')
-        FROM LEISTUNG l
-        WHERE l.PATIENTID = k.PATIENTID
+        FROM ck.LEISTUNG l
+        WHERE l.PATIENTID = k.PATNR  -- Note: PATIENTID matches PATNR!
           AND l.DATUM = k.DATUM
-    ) AS service_codes
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-WHERE k.DATUM = '2022-01-18';
+          AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
+    ), '') AS service_codes
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118';
 GO
 ```
 
 **Result:**
 ```
-date        patient_id  insurance_status  insurance_name          chart_entry                     service_codes
-----------  ----------  ----------------  ----------------------  ----------------------------------  -------------
-2022-01-18  1           GKV               AOK Bayern              Kontrolle, Befund unauffällig       01, 1040
-2022-01-18  1           GKV               AOK Bayern              Zahnreinigung durchgeführt          01, 1040
-2022-01-18  2           GKV               DAK Gesundheit          Füllungstherapie Zahn 36            13b
-2022-01-18  3           GKV               Techniker Krankenkasse  Röntgenaufnahme OPG                 Ä935
-2022-01-18  4           PKV               PRIVAT                  Beratung Zahnersatz                 NULL
-2022-01-18  5           GKV               Barmer                  Professionelle Zahnreinigung        NULL
+date        patient_id  insurance_status  insurance_name  chart_entry                                                                       service_codes
+----------  ----------  ----------------  --------------  --------------------------------------------------------------------------------  -------------
+2022-01-18  1           GKV               DAK Gesundheit  Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG
+2022-01-18  1           GKV               DAK Gesundheit  Ausführliche Aufklärung über Mundhygiene und Putztechnik,
+2022-01-18  1           GKV               DAK Gesundheit  Kontrolle,
+2022-01-18  1           GKV               DAK Gesundheit  Kontrolle,
 ```
 
-✅ All 5 required fields!
+✅ All 5 required fields! (Note: service_codes is empty - all LEISTUNG records are soft-deleted in this database)
 
 ---
 
@@ -230,82 +268,66 @@ date        patient_id  insurance_status  insurance_name          chart_entry   
 
 ## Final Query with JSON Output
 
-### Option 1: JSON rows (SQL Server 2016+)
+### Option 1: Tabular output (for Python processing)
 
 ```sql
 SELECT
-    k.DATUM AS date,
-    k.PATIENTID AS patient_id,
-    CASE ka.TYP
-        WHEN 'G' THEN 'GKV'
-        WHEN 'P' THEN 'PKV'
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    CASE
+        WHEN ka.ART = 'P' THEN 'PKV'
+        WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
         ELSE 'Selbstzahler'
     END AS insurance_status,
-    ISNULL(ka.NAME, 'Keine') AS insurance_name,
-    k.EINTRAG AS chart_entry,
+    ISNULL(ka.NAME, '') AS insurance_name,
+    LEFT(ISNULL(k.BEMERKUNG, ''), 500) AS chart_entry,
     ISNULL((
         SELECT STRING_AGG(l.LEISTUNG, ', ')
-        FROM LEISTUNG l
-        WHERE l.PATIENTID = k.PATIENTID
+        FROM ck.LEISTUNG l
+        WHERE l.PATIENTID = k.PATNR
           AND l.DATUM = k.DATUM
+          AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
     ), '') AS service_codes
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-WHERE k.DATUM = '2022-01-18'
-FOR JSON PATH;
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118'
+ORDER BY k.PATNR;
 GO
 ```
 
-**Output:**
-```json
-[
-  {
-    "date": "2022-01-18",
-    "patient_id": 1,
-    "insurance_status": "GKV",
-    "insurance_name": "AOK Bayern",
-    "chart_entry": "Kontrolle, Befund unauffällig",
-    "service_codes": "01, 1040"
-  },
-  {
-    "date": "2022-01-18",
-    "patient_id": 1,
-    "insurance_status": "GKV",
-    "insurance_name": "AOK Bayern",
-    "chart_entry": "Zahnreinigung durchgeführt",
-    "service_codes": "01, 1040"
-  },
-  ...
-]
-```
-
----
-
-### Option 2: Service codes as JSON array
+### Option 2: JSON rows (SQL Server 2016+)
 
 ```sql
 SELECT
-    k.DATUM AS date,
-    k.PATIENTID AS patient_id,
-    CASE ka.TYP
-        WHEN 'G' THEN 'GKV'
-        WHEN 'P' THEN 'PKV'
+    SUBSTRING(k.DATUM, 1, 4) + '-' +
+    SUBSTRING(k.DATUM, 5, 2) + '-' +
+    SUBSTRING(k.DATUM, 7, 2) AS date,
+    k.PATNR AS patient_id,
+    CASE
+        WHEN ka.ART = 'P' THEN 'PKV'
+        WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
         ELSE 'Selbstzahler'
     END AS insurance_status,
-    ISNULL(ka.NAME, 'Keine') AS insurance_name,
-    k.EINTRAG AS chart_entry,
-    (
-        SELECT l.LEISTUNG AS code
-        FROM LEISTUNG l
-        WHERE l.PATIENTID = k.PATIENTID
+    ISNULL(ka.NAME, '') AS insurance_name,
+    LEFT(ISNULL(k.BEMERKUNG, ''), 500) AS chart_entry,
+    ISNULL((
+        SELECT STRING_AGG(l.LEISTUNG, ', ')
+        FROM ck.LEISTUNG l
+        WHERE l.PATIENTID = k.PATNR
           AND l.DATUM = k.DATUM
-        FOR JSON PATH
-    ) AS service_codes
-FROM KARTEI k
-JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-WHERE k.DATUM = '2022-01-18'
+          AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
+    ), '') AS service_codes
+FROM ck.KARTEI k
+JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+    AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+  AND k.DATUM = '20220118'
 FOR JSON PATH;
 GO
 ```
@@ -317,11 +339,18 @@ GO
     "date": "2022-01-18",
     "patient_id": 1,
     "insurance_status": "GKV",
-    "insurance_name": "AOK Bayern",
-    "chart_entry": "Kontrolle, Befund unauffällig",
-    "service_codes": [{"code": "01"}, {"code": "1040"}]
+    "insurance_name": "DAK Gesundheit",
+    "chart_entry": "Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG",
+    "service_codes": ""
   },
-  ...
+  {
+    "date": "2022-01-18",
+    "patient_id": 1,
+    "insurance_status": "GKV",
+    "insurance_name": "DAK Gesundheit",
+    "chart_entry": "Kontrolle,",
+    "service_codes": ""
+  }
 ]
 ```
 
@@ -343,37 +372,46 @@ def extract_daily_entries(target_date: date) -> list:
         "TrustServerCertificate=yes"
     )
 
+    # Convert date to YYYYMMDD format for query
+    date_str = target_date.strftime('%Y%m%d')
+
     query = """
     SELECT
-        k.DATUM AS date,
-        k.PATIENTID AS patient_id,
-        CASE ka.TYP
-            WHEN 'G' THEN 'GKV'
-            WHEN 'P' THEN 'PKV'
+        SUBSTRING(k.DATUM, 1, 4) + '-' +
+        SUBSTRING(k.DATUM, 5, 2) + '-' +
+        SUBSTRING(k.DATUM, 7, 2) AS date,
+        k.PATNR AS patient_id,
+        CASE
+            WHEN ka.ART = 'P' THEN 'PKV'
+            WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
             ELSE 'Selbstzahler'
         END AS insurance_status,
-        ISNULL(ka.NAME, 'Keine') AS insurance_name,
-        k.EINTRAG AS chart_entry,
+        ISNULL(ka.NAME, '') AS insurance_name,
+        LEFT(ISNULL(k.BEMERKUNG, ''), 500) AS chart_entry,
         ISNULL((
             SELECT STRING_AGG(l.LEISTUNG, ', ')
-            FROM LEISTUNG l
-            WHERE l.PATIENTID = k.PATIENTID
+            FROM ck.LEISTUNG l
+            WHERE l.PATIENTID = k.PATNR
               AND l.DATUM = k.DATUM
+              AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
         ), '') AS service_codes
-    FROM KARTEI k
-    JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-    LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-    WHERE k.DATUM = ?
+    FROM ck.KARTEI k
+    JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+        AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+    LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+    WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+      AND k.DATUM = ?
+    ORDER BY k.PATNR
     """
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
-    cursor.execute(query, target_date)
+    cursor.execute(query, date_str)
 
     entries = []
     for row in cursor.fetchall():
         entries.append({
-            "date": row.date.isoformat() if row.date else None,
+            "date": row.date,
             "patient_id": row.patient_id,
             "insurance_status": row.insurance_status,
             "insurance_name": row.insurance_name,
@@ -398,6 +436,8 @@ if __name__ == "__main__":
 ## Save to File
 
 ```python
+from datetime import datetime
+
 def save_output(entries: list, target_date: date, format: str = "json"):
     filename = f"ivoris_chart_entries_{target_date.isoformat()}.{format}"
 
@@ -426,6 +466,21 @@ def save_output(entries: list, target_date: date, format: str = "json"):
 
     print(f"Saved {len(entries)} entries to {filename}")
 ```
+
+---
+
+## Key Schema Differences (What We Discovered)
+
+| Expected | Actual | Notes |
+|----------|--------|-------|
+| `dbo` schema | `ck` schema | All tables in `ck.*` |
+| `PATIENTID` | `PATNR` | In KARTEI and PATKASSE |
+| `EINTRAG` | `BEMERKUNG` | Chart entry column |
+| `KASSE.TYP` | `KASSEN.ART` | Different table AND column |
+| `TYP = 'G'/'P'` | `ART = '1'-'9'/'P'` | Numbers for GKV types |
+| Direct PATIENT→KASSE | PATKASSE junction | Extra table needed |
+| DATE type | VARCHAR(8) | YYYYMMDD strings |
+| No soft delete | `DELKZ` flag | Must filter everywhere |
 
 ---
 

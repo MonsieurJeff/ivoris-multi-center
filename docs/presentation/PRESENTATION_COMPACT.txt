@@ -1,0 +1,229 @@
+IVORIS EXTRACTION PIPELINE — LOOM RECORDING (6 min)
+=====================================================
+
+HOOK (10s): "I built a daily extraction pipeline. Then I asked: what happens at scale? I built that too."
+
+================================================================================
+DIRECT STEPS OVERVIEW
+================================================================================
+Step 0: Understand requirement  → 5 fields → CSV/JSON
+Step 1: Explore the database    → Identify tables & columns
+Step 2: Write 4-table JOIN      → KARTEI + PATIENT + PATKASSE + KASSEN
+Step 3: Query service codes     → LEISTUNG table
+Step 4: Map insurance status    → GKV / PKV / Selbstzahler
+Step 5: Export to CSV + JSON    → Done
+
+================================================================================
+PART 1: MAIN CHALLENGE (3 min)
+================================================================================
+
+1.1 REQUIREMENT (20s)
+    SAY: "5 fields: Date, Patient ID, Insurance, Chart Entry, Services → CSV/JSON"
+
+1.2 DATABASE SETUP (Context 15s)
+    SAY: "Challenge provided DentalDB.bak backup file"
+         "Restored to Docker container for local development"
+         "Exact schema and sample data from challenge"
+    (Setup: docker-compose up → docker cp DentalDB.bak → RESTORE DATABASE)
+
+1.3 EXPLORE DATABASE (Optional 30s)
+    1.3.1 START DOCKER:
+          docker-compose up -d
+    1.3.2 LIST DATABASES (one-liner):
+          docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P 'Clinero2026' -C \
+            -Q "SELECT name FROM sys.databases WHERE name LIKE 'DentalDB%'"
+    1.3.3 LIST TABLES (one-liner):
+          docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P 'Clinero2026' -C -d DentalDB_01 \
+            -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='ck'"
+    1.3.4 PREVIEW DATA (one-liner):
+          docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P 'Clinero2026' -C -d DentalDB_01 \
+            -Q "SELECT TOP 3 * FROM ck.KARTEI"
+    SAY: "30 databases, 5 tables each: KARTEI, PATIENT, PATKASSE, KASSEN, LEISTUNG"
+
+1.4 DATABASE QUERY (45s)
+    SHOW: src/adapters/center_adapter.py:86-101
+    SAY: "4-table JOIN: KARTEI → PATIENT → PATKASSE → KASSEN, filtered by date"
+
+1.5 SERVICE CODES (30s)
+    SHOW: src/adapters/center_adapter.py:131-161
+    SAY: "Second query for LEISTUNG table, grouped by patient"
+
+1.6 INSURANCE MAPPING (20s)
+    SHOW: src/adapters/center_adapter.py:163-169
+    SAY: "GKV=public, PKV=private, Selbstzahler=self-pay"
+
+1.7 EXPORT DEMO (30s)
+    RUN:  python -m src.cli extract --date 2022-01-18 -c center_01
+    RUN:  cat data/output/ivoris_multi_center_2022-01-18.json | head -30
+    SAY: "All 5 fields extracted. Main challenge complete."
+
+    TRANSITION: "But Clinero manages 30 centers, not one..."
+
+================================================================================
+PART 2: EXTENSION CHALLENGE (3 min)
+================================================================================
+
+2.1 THE PROBLEM (30s)
+    COMPARE TABLES (Terminal):
+          # Center 01 tables (clean)
+          docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P 'Clinero2026' -C -d DentalDB_01 \
+            -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='ck' AND TABLE_NAME LIKE 'KARTEI%'"
+          # Center 02 tables (suffixes)
+          docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P 'Clinero2026' -C -d DentalDB_02 \
+            -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='ck' AND TABLE_NAME LIKE 'KARTEI%'"
+    OR SHOW: data/mappings/center_01_mapping.json vs center_02_mapping.json
+    SAY: "Center 01 is clean — like Main Challenge"
+         "Center 02 has random suffixes: KARTEI_XYZ, PATNR_ABC"
+         "Every other center is different"
+
+2.2 THE SOLUTION (45s)
+    SHOW: src/adapters/center_adapter.py:64-85
+    SAY: "Schema mapping: canonical → actual names, one template for all"
+
+2.3 BENCHMARK DEMO (45s)
+    RUN:  python -m src.cli benchmark
+    SAY: "30 centers, under 500ms. Target was 5s — beat it by 25x"
+
+2.4 WEB UI DEMO (45s)
+    OPEN: http://localhost:8000/metrics
+    CLICK: Select All → Benchmark
+    SAY: "Dashboard for ops team, per-center timing, JSON/CSV export"
+
+================================================================================
+CLOSING (15s)
+================================================================================
+SAY: "Part 1: 4-table join, dual export. Part 2: 30 centers, schema mapping.
+     Production-ready. Thanks for watching."
+
+================================================================================
+TIMELINE (quick reference)
+================================================================================
+TIME  | SECTION        | SHOW                          | DO
+------|----------------|-------------------------------|---------------------------
+0:00  | HOOK           | —                             | "I built... what at scale?"
+0:10  | 1.1 Require    | —                             | "5 fields → CSV/JSON"
+0:25  | 1.2 DB Setup   | —                             | "DentalDB.bak → Docker"
+0:40  | 1.3 Explore DB | Terminal (sqlcmd)             | OPTIONAL: tables/columns
+1:10  | 1.4 SQL        | center_adapter.py:86-101      | Highlight 4-table JOIN
+1:55  | 1.5 Services   | center_adapter.py:131-161     | Highlight LEISTUNG
+2:25  | 1.6 Insurance  | center_adapter.py:163-169     | GKV/PKV mapping
+2:45  | 1.7 Export     | Terminal                      | RUN extract + cat json
+3:15  | TRANSITION     | —                             | "But 30 centers..."
+3:25  | 2.1 Problem    | center_01 + center_02 .json   | Side-by-side
+3:55  | 2.2 Solution   | center_adapter.py:64-85       | Schema mapping
+4:30  | 2.3 Benchmark  | Terminal                      | RUN benchmark
+5:15  | 2.4 Web UI     | Browser :8000/metrics         | Select All → Benchmark
+6:00  | CLOSING        | —                             | "Production-ready"
+
+================================================================================
+ARCHITECTURE
+================================================================================
+┌─────────────────────────────────────────────────────────┐
+│  center_01   center_02    center_03         center_30  │
+│  (clean)     (_DLI)       (_XQ4)      ...   (_LA)      │
+│      │          │            │                 │       │
+│      └──────────┴────────────┴─────────────────┘       │
+│                         ▼                              │
+│            Schema Mapping Layer                        │
+│       KARTEI → KARTEI | KARTEI_DLI | ...              │
+│                         ▼                              │
+│            Extraction Service                          │
+│                         ▼                              │
+│              CSV / JSON Output                         │
+└─────────────────────────────────────────────────────────┘
+
+================================================================================
+KEY NUMBERS
+================================================================================
+30 centers  |  5 fields  |  4-table JOIN  |  <500ms  |  25x faster than target
+
+================================================================================
+COMMANDS (copy-paste ready)
+================================================================================
+# Database exploration (optional)
+python -m src.cli list
+python -m src.cli discover-raw -c center_01
+python -m src.cli show-mapping center_01
+python -m src.cli show-mapping center_02
+
+# Part 1 demo
+python -m src.cli extract --date 2022-01-18 -c center_01
+cat data/output/ivoris_multi_center_2022-01-18.json | head -30
+
+# Part 2 demo
+python -m src.cli benchmark
+
+# Web UI (start before recording)
+python -m src.cli web
+
+================================================================================
+SCREEN LAYOUT
+================================================================================
+┌─────────────────────────────┬──────────────┐
+│  Editor (70%)               │ Terminal 30% │
+│  1. center_adapter.py       │              │
+│  2. extraction.py           │   $ _        │
+│  3. center_01_mapping.json  │              │
+│  4. center_02_mapping.json  │              │
+└─────────────────────────────┴──────────────┘
+Browser: hidden until 2.4, then fullscreen
+
+================================================================================
+PRE-FLIGHT
+================================================================================
+# Docker (SQL Server + 30 databases, port 1434)
+docker-compose up -d                               # Start
+docker-compose restart                             # Restart
+docker-compose down && docker-compose up -d        # Full reset
+
+# Verify
+docker ps | grep 1434                              # Container running?
+python -m src.cli benchmark                        # Extraction works?
+python -m src.cli web                              # Web UI works?
+
+================================================================================
+WHY DOCKER?
+================================================================================
+Cross-platform   → SQL Server on macOS/Linux via container
+Isolation        → No install conflicts, doesn't touch host
+Reproducible     → Same setup every time
+Easy reset       → docker-compose down && up = fresh start
+30 databases     → One SQL Server instance, 30 DBs inside
+
+================================================================================
+KEY POINTS FOR STAKEHOLDERS
+================================================================================
+
+BUSINESS:
+  Maintenance   → "Add new center in minutes — JSON config, no code changes"
+  Scalability   → "30 centers today, 300 tomorrow, same architecture"
+  ROI           → "Daily extraction unattended — no manual export, no error"
+
+IT EXPERTS:
+  Maintenance   → "One SQL template — fix once, deploy everywhere"
+  Security      → "Parameterized queries — SQL injection protection built-in"
+  Scalability   → "Connection pooling ready, async if needed"
+  Adaptability  → "Auto-discovers schema variations, handles legacy naming"
+
+UX PROSUMER (BOTH):
+  Dashboard     → "Ops team sees 30 centers at a glance — no SQL needed"
+  Dual export   → "CSV for Excel, JSON for APIs — same extraction"
+  Self-service  → "CLI for power users, dashboard for operations"
+
+PHRASES TO DROP IN:
+  • "Zero-touch onboarding"
+  • "Configuration over code"
+  • "Single source of truth"
+  • "Fail-fast with clear errors"
+
+DON'T MENTION: Docker internals, SQL Server specifics, Python details
+FOCUS ON: Outcomes, not implementation
+
+================================================================================
+IF DEMO FAILS → Show code + pre-generated output files in data/output/
+================================================================================

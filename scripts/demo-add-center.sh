@@ -77,7 +77,7 @@ echo -e "───────────────────────�
 echo ""
 
 # Check if database exists
-DB_EXISTS=$(docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "MultiCenter@2024" -C -Q "SELECT DB_ID('$NEW_CENTER_DB')" -h -1 2>/dev/null | tr -d '[:space:]')
+DB_EXISTS=$(docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Clinero2026" -C -Q "SELECT DB_ID('$NEW_CENTER_DB')" -h -1 2>/dev/null | tr -d '[:space:]')
 
 if [ "$DB_EXISTS" != "NULL" ] && [ -n "$DB_EXISTS" ]; then
     echo -e "  ${GREEN}✓${NC} Database $NEW_CENTER_DB already exists"
@@ -93,11 +93,11 @@ else
     echo -e "  ${CYAN}Random suffixes: KARTEI_${RED}$TABLE_SUFFIX${NC}, PATNR_${RED}$COL_SUFFIX_1${NC}${NC}"
 
     # Create database and tables
-    docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "MultiCenter@2024" -C -Q "
+    docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Clinero2026" -C -Q "
         CREATE DATABASE [$NEW_CENTER_DB];
     " 2>/dev/null
 
-    docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "MultiCenter@2024" -C -d "$NEW_CENTER_DB" -Q "
+    docker exec ivoris-multi-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Clinero2026" -C -d "$NEW_CENTER_DB" -Q "
         CREATE SCHEMA ck;
 
         CREATE TABLE ck.PATIENT_$TABLE_SUFFIX (

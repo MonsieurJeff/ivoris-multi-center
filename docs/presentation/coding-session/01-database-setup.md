@@ -3,7 +3,7 @@
 > **💬 Talking Points**
 > - "In reality, customers send us their database backup files - usually `.bak` files from SQL Server"
 > - "For security reasons, we always work on a copy, never the production database"
-> - "Today I'll show you three ways to set this up - choose based on your situation"
+> - "The real challenge: we don't know the schema until we explore it"
 
 ---
 
@@ -12,15 +12,16 @@
 Ivoris dental software uses Microsoft SQL Server. In a real scenario, you would:
 1. Get a database backup (.bak file) from the customer
 2. Restore it to your local SQL Server for development
+3. **Discover** the schema - every customer's database may be different!
 
 ---
 
-> **💬 Talking Points - Option A**
+## Option A: Restore from .bak Backup File
+
+> **💬 Talking Points**
 > - "This is the real-world scenario - customer gives you their backup"
 > - "The `WITH MOVE` is crucial - it remaps the file paths to our container"
 > - "Always use `REPLACE` to overwrite if you're doing multiple restores"
-
-## Option A: Restore from .bak Backup File
 
 ### 1. Copy backup to Docker container
 
@@ -33,8 +34,8 @@ docker cp /path/to/DentalDB.bak ivoris-sqlserver:/var/opt/mssql/backup/
 
 ```bash
 # Using sqlcmd inside container
-docker exec -it ivoris-sqlserver /opt/mssql-tools/bin/sqlcmd \
-  -S localhost -U sa -P 'YourStrong@Passw0rd'
+docker exec -it ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'YourStrong@Passw0rd' -C
 ```
 
 ### 3. List available backups
@@ -74,87 +75,40 @@ GO
 
 ---
 
-> **💬 Talking Points - Option B**
-> - "For demos or when you don't have customer data yet"
-> - "Notice the German column names - this is authentic to the Ivoris software"
-> - "TYP with 'G' and 'P' represents the German insurance system"
+## Option B: Use Existing Docker Setup
 
-## Option B: Create Test Database (For Demo)
+> **💬 Talking Points**
+> - "We already have a restored database in our Docker container"
+> - "This is the real Ivoris schema - 400+ tables!"
+> - "The challenge is discovering which tables we need"
 
-If no backup available, create a test database with sample data:
-
-```bash
-# Run the test database generator
-cd ~/Projects/outre_base/sandbox/ivoris-pipeline
-python scripts/create_test_db.py
-```
-
-Or manually:
-
-```sql
--- Create database
-CREATE DATABASE DentalDB;
-GO
-
-USE DentalDB;
-GO
-
--- Create PATIENT table
-CREATE TABLE PATIENT (
-    PATIENTID INT PRIMARY KEY,
-    NAME NVARCHAR(100),
-    VORNAME NVARCHAR(100),
-    GEBDAT DATE,
-    KASSEID INT
-);
-
--- Create KASSE table (Insurance)
-CREATE TABLE KASSE (
-    KASSEID INT PRIMARY KEY,
-    NAME NVARCHAR(100),
-    TYP CHAR(1)  -- 'G' = GKV, 'P' = PKV
-);
-
--- Create KARTEI table (Chart entries)
-CREATE TABLE KARTEI (
-    KARTEIID INT PRIMARY KEY,
-    PATIENTID INT,
-    DATUM DATE,
-    EINTRAG NVARCHAR(MAX),
-    FOREIGN KEY (PATIENTID) REFERENCES PATIENT(PATIENTID)
-);
-
--- Create LEISTUNG table (Services)
-CREATE TABLE LEISTUNG (
-    LEISTUNGID INT PRIMARY KEY,
-    PATIENTID INT,
-    DATUM DATE,
-    LEISTUNG NVARCHAR(20),  -- Service code like '01', 'Ä1', '2060'
-    FOREIGN KEY (PATIENTID) REFERENCES PATIENT(PATIENTID)
-);
-GO
-```
-
----
-
-> **💬 Talking Points - Option C**
-> - "This is the fastest way - everything is pre-configured"
-> - "The docker-compose handles all the setup automatically"
-> - "We'll use this for today's session to save time"
-
-## Option C: Use Existing Docker Setup
-
-Our project already has a docker-compose that creates the database:
+Our project already has a docker-compose with the database:
 
 ```bash
-cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
 docker-compose up -d
 
 # Wait for SQL Server to start (~10 seconds)
 sleep 10
 
-# Database is auto-created with test data
+# Verify database exists
+docker exec ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'YourStrong@Passw0rd' -C \
+  -Q "SELECT name FROM sys.databases WHERE name = 'DentalDB'"
 ```
+
+---
+
+## What We're Working With
+
+The real DentalDB has:
+- **400+ tables** - not just 4!
+- **Custom schema** - tables are in `ck` schema, not `dbo`
+- **Soft deletes** - `DELKZ` column on every table
+- **German column names** - need to discover what they mean
+- **Different data types** - dates stored as `VARCHAR(8)` in YYYYMMDD format
+
+**This is the real challenge** - discovering the right tables and columns.
 
 ---
 
@@ -165,9 +119,14 @@ sleep 10
 docker ps | grep ivoris
 
 # Check database exists
-docker exec ivoris-sqlserver /opt/mssql-tools/bin/sqlcmd \
-  -S localhost -U sa -P 'YourStrong@Passw0rd' \
+docker exec ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'YourStrong@Passw0rd' -C \
   -Q "SELECT name FROM sys.databases"
+
+# Count tables (expect 400+)
+docker exec ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'YourStrong@Passw0rd' -C -d DentalDB \
+  -Q "SELECT COUNT(*) AS table_count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'"
 ```
 
 ---

@@ -4,109 +4,136 @@ EXPECTED TERMINAL OUTPUT - Use this if live demo fails
 
 --- Docker Startup ---
 $ docker-compose up -d
-Creating network "ivoris-pipeline_default" with the default driver
+Creating network "ivoris-multi-center_default" with the default driver
 Creating ivoris-sqlserver ... done
 
 $ docker ps | grep ivoris
-abc123def456   mcr.microsoft.com/mssql/server:2019-latest   Up 2 minutes   0.0.0.0:1433->1433/tcp   ivoris-sqlserver
+abc123def456   mcr.microsoft.com/mssql/server:2022-latest   Up 2 minutes   0.0.0.0:1433->1433/tcp   ivoris-sqlserver
 
 --- SQL Server Connection ---
-$ docker exec -it ivoris-sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -d DentalDB
+$ docker exec -it ivoris-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -C -d DentalDB
 1>
 
---- List Tables ---
-1> SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;
+--- List Schemas ---
+1> SELECT DISTINCT TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA;
+2> GO
+TABLE_SCHEMA
+------------
+ck
+ckexternpu
+dbo
+
+(3 rows affected)
+
+--- Count Tables Per Schema ---
+1> SELECT TABLE_SCHEMA, COUNT(*) AS table_count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' GROUP BY TABLE_SCHEMA ORDER BY table_count DESC;
+2> GO
+TABLE_SCHEMA  table_count
+------------  -----------
+ck            487
+dbo           4
+ckexternpu    1
+
+(3 rows affected)
+
+--- Find KARTEI Tables ---
+1> SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME LIKE '%KARTEI%';
 2> GO
 TABLE_NAME
 --------------------
 KARTEI
-KASSE
-LEISTUNG
-PATIENT
+KARTEIABRECHNUNG
+KARTEIABTEILUNG
+...
 
-(4 rows affected)
+(many rows affected)
 
---- List Columns (one per line) ---
-1> SELECT TABLE_NAME + '.' + COLUMN_NAME + ' (' + DATA_TYPE + ')' FROM INFORMATION_SCHEMA.COLUMNS ORDER BY TABLE_NAME, ORDINAL_POSITION;
+--- List KARTEI Columns ---
+1> SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'KARTEI' ORDER BY ORDINAL_POSITION;
 2> GO
+COLUMN_NAME    DATA_TYPE  CHARACTER_MAXIMUM_LENGTH
+-----------    ---------  ------------------------
+ID             int        NULL
+PATNR          int        NULL
+DATUM          varchar    8
+BEMERKUNG      varchar    -1
+DELKZ          bit        NULL
+...
 
-KARTEI.KARTEIID (int)
-KARTEI.PATIENTID (int)
-KARTEI.DATUM (date)
-KARTEI.EINTRAG (nvarchar)
-KASSE.KASSEID (int)
-KASSE.NAME (nvarchar)
-KASSE.TYP (char)
-LEISTUNG.LEISTUNGID (int)
-LEISTUNG.PATIENTID (int)
-LEISTUNG.DATUM (date)
-LEISTUNG.LEISTUNG (nvarchar)
-PATIENT.PATIENTID (int)
-PATIENT.NAME (nvarchar)
-PATIENT.VORNAME (nvarchar)
-PATIENT.GEBDAT (date)
-PATIENT.KASSEID (int)
-
-(16 rows affected)
+(many rows affected)
 
 --- Sample KARTEI Data ---
-1> SELECT TOP 5 * FROM KARTEI;
+1> SELECT TOP 5 ID, PATNR, DATUM, LEFT(BEMERKUNG, 50) AS bemerkung FROM ck.KARTEI WHERE DELKZ = 0 OR DELKZ IS NULL ORDER BY DATUM DESC;
 2> GO
-KARTEIID  PATIENTID  DATUM       EINTRAG
---------  ---------  ----------  ----------------------------------
-1         1          2022-01-18  Kontrolle, Befund unauffällig
-2         1          2022-01-18  Zahnreinigung durchgeführt
-3         2          2022-01-18  Füllungstherapie Zahn 36
-4         3          2022-01-18  Röntgenaufnahme OPG
-5         4          2022-01-18  Beratung Zahnersatz
+ID  PATNR  DATUM     bemerkung
+--  -----  --------  --------------------------------------------------
+1   1      20241029
+2   1      20230519  Behandlungsmitteilung (19.05.2023)
+3   1      20220118  Kontrolle,
+...
 
 (5 rows affected)
 
---- Sample KASSE Data ---
-1> SELECT * FROM KASSE;
+--- Sample KASSEN Data ---
+1> SELECT ART, COUNT(*) as cnt, MIN(NAME) as example FROM ck.KASSEN WHERE DELKZ = 0 OR DELKZ IS NULL GROUP BY ART ORDER BY cnt DESC;
 2> GO
-KASSEID  NAME                    TYP
--------  ----------------------  ---
-1        AOK Bayern              G
-2        DAK Gesundheit          G
-3        Techniker Krankenkasse  G
-4        PRIVAT                  P
-5        Barmer                  G
+ART  cnt    example
+---  -----  -------
+6    20707  abc BKK
+4    2549   AOK Albstadt
+9    1418   ...
+8    849    BARMER
+P    54     Albingia
+...
+
+(many rows affected)
+
+--- Check PATKASSE Junction Table ---
+1> SELECT TOP 5 PATNR, KASSENID FROM ck.PATKASSE WHERE DELKZ = 0 OR DELKZ IS NULL;
+2> GO
+PATNR  KASSENID
+-----  --------
+1      27813
+...
 
 (5 rows affected)
 
---- Final Extraction Query ---
+--- Final Extraction Query (Real Schema) ---
 1> SELECT
-2>     k.DATUM AS date,
-3>     k.PATIENTID AS patient_id,
-4>     CASE ka.TYP
-5>         WHEN 'G' THEN 'GKV'
-6>         WHEN 'P' THEN 'PKV'
-7>         ELSE 'Selbstzahler'
-8>     END AS insurance_status,
-9>     ISNULL(ka.NAME, '') AS insurance_name,
-10>    k.EINTRAG AS chart_entry,
-11>    ISNULL((
-12>        SELECT STRING_AGG(l.LEISTUNG, ', ')
-13>        FROM LEISTUNG l
-14>        WHERE l.PATIENTID = k.PATIENTID AND l.DATUM = k.DATUM
-15>    ), '') AS service_codes
-16> FROM KARTEI k
-17> JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-18> LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-19> WHERE k.DATUM = '2022-01-18';
-20> GO
+2>     SUBSTRING(k.DATUM, 1, 4) + '-' +
+3>     SUBSTRING(k.DATUM, 5, 2) + '-' +
+4>     SUBSTRING(k.DATUM, 7, 2) AS date,
+5>     k.PATNR AS patient_id,
+6>     CASE
+7>         WHEN ka.ART = 'P' THEN 'PKV'
+8>         WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
+9>         ELSE 'Selbstzahler'
+10>    END AS insurance_status,
+11>    ISNULL(ka.NAME, '') AS insurance_name,
+12>    LEFT(ISNULL(k.BEMERKUNG, ''), 80) AS chart_entry,
+13>    ISNULL((
+14>        SELECT STRING_AGG(l.LEISTUNG, ', ')
+15>        FROM ck.LEISTUNG l
+16>        WHERE l.PATIENTID = k.PATNR
+17>          AND l.DATUM = k.DATUM
+18>          AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
+19>    ), '') AS service_codes
+20> FROM ck.KARTEI k
+21> JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+22>     AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+23> LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+24> WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+25>   AND k.DATUM = '20220118';
+26> GO
 
-date        patient_id  insurance_status  insurance_name          chart_entry                       service_codes
-----------  ----------  ----------------  ----------------------  --------------------------------  -------------
-2022-01-18  1           GKV               AOK Bayern              Kontrolle, Befund unauffällig    01, 1040
-2022-01-18  1           GKV               AOK Bayern              Zahnreinigung durchgeführt       01, 1040
-2022-01-18  2           GKV               DAK Gesundheit          Füllungstherapie Zahn 36         13b
-2022-01-18  3           GKV               Techniker Krankenkasse  Röntgenaufnahme OPG              Ä935
-2022-01-18  4           PKV               PRIVAT                  Beratung Zahnersatz
-2022-01-18  5           GKV               Barmer                  Professionelle Zahnreinigung
+date        patient_id  insurance_status  insurance_name  chart_entry                                                                       service_codes
+----------  ----------  ----------------  --------------  --------------------------------------------------------------------------------  -------------
+2022-01-18  1           GKV               DAK Gesundheit  Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG
+2022-01-18  1           GKV               DAK Gesundheit  Ausführliche Aufklärung über Mundhygiene und Putztechnik,
+2022-01-18  1           GKV               DAK Gesundheit  Kontrolle,
+2022-01-18  1           GKV               DAK Gesundheit  Kontrolle,
 
-(6 rows affected)
+(4 rows affected)
 
 --- Python Script Output ---
 $ python src/main.py --test-connection
@@ -114,12 +141,29 @@ $ python src/main.py --test-connection
 
 $ python src/main.py --daily-extract --date 2022-01-18
 Extracting chart entries for 2022-01-18...
-Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.json
+Saved 4 entries to data/output/ivoris_chart_entries_2022-01-18.json
 Done! Output: data/output/ivoris_chart_entries_2022-01-18.json
 
 $ python src/main.py --daily-extract --date 2022-01-18 --format csv
 Extracting chart entries for 2022-01-18...
-Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.csv
+Saved 4 entries to data/output/ivoris_chart_entries_2022-01-18.csv
 Done! Output: data/output/ivoris_chart_entries_2022-01-18.csv
 
+================================================================================
+KEY SCHEMA DIFFERENCES (What We Discovered):
+================================================================================
+
+| Expected              | Real Ivoris Schema    |
+|-----------------------|-----------------------|
+| dbo schema            | ck schema             |
+| PATIENTID             | PATNR                 |
+| EINTRAG               | BEMERKUNG             |
+| KASSE.TYP = 'G'/'P'   | KASSEN.ART = '1'-'9'/'P' |
+| Direct PATIENT→KASSE  | PATKASSE junction     |
+| DATE type             | VARCHAR(8) YYYYMMDD   |
+| No soft delete        | DELKZ flag            |
+
+================================================================================
+NOTE: service_codes is empty because all LEISTUNG records in this database
+are marked as soft-deleted (DELKZ=1). The schema and query are correct.
 ================================================================================

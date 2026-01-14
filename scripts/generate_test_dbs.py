@@ -96,6 +96,9 @@ def generate_schema_mapping(center_id: str) -> dict:
     """
     Generate random suffixes for each table and column.
 
+    NOTE: center_01 uses clean names (no suffixes) to match the
+    original Main Challenge schema. All other centers have random suffixes.
+
     Returns a mapping structure like:
     {
         "center_id": "center_01",
@@ -113,6 +116,9 @@ def generate_schema_mapping(center_id: str) -> dict:
         }
     }
     """
+    # center_01 uses clean schema (no suffixes) - matches Main Challenge
+    use_clean_schema = (center_id == "center_01")
+
     mapping = {
         "center_id": center_id,
         "schema": "ck",
@@ -120,13 +126,18 @@ def generate_schema_mapping(center_id: str) -> dict:
     }
 
     for table_name, table_def in CANONICAL_SCHEMA.items():
-        table_suffix = generate_suffix()
-        actual_table_name = f"{table_name}_{table_suffix}"
+        if use_clean_schema:
+            actual_table_name = table_name
+        else:
+            table_suffix = generate_suffix()
+            actual_table_name = f"{table_name}_{table_suffix}"
 
         column_mapping = {}
         for col in table_def["columns"]:
             # Keep ID and DELKZ columns unchanged (they're standard)
             if col in ("ID", "DELKZ"):
+                column_mapping[col] = col
+            elif use_clean_schema:
                 column_mapping[col] = col
             else:
                 col_suffix = generate_suffix()
@@ -358,6 +369,11 @@ def main():
     logger.info("Connected!\n")
 
     for center in centers:
+        # Skip center_01 - it has the real challenge database
+        if center["id"] == "center_01":
+            logger.info(f"Skipping {center['name']} ({center['database']}) - using real challenge database")
+            continue
+
         logger.info(f"Creating {center['name']} ({center['database']})...")
 
         try:

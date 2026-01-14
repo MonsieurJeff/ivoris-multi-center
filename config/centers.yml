@@ -5,7 +5,7 @@ database:
   host: localhost
   port: 1434
   user: sa
-  password: MultiCenter@2024
+  password: Clinero2026
   driver: ODBC Driver 18 for SQL Server
 
 centers:

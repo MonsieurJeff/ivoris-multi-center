@@ -1,54 +1,38 @@
 {
-  "extraction_timestamp": "2024-01-18T06:00:00.000000",
+  "extraction_timestamp": "2026-01-14T06:00:00.000000",
   "target_date": "2022-01-18",
-  "record_count": 6,
+  "record_count": 4,
   "entries": [
     {
       "date": "2022-01-18",
       "patient_id": 1,
       "insurance_status": "GKV",
-      "insurance_name": "AOK Bayern",
-      "chart_entry": "Kontrolle, Befund unauffällig",
-      "service_codes": ["01", "1040"]
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG",
+      "service_codes": []
     },
     {
       "date": "2022-01-18",
       "patient_id": 1,
       "insurance_status": "GKV",
-      "insurance_name": "AOK Bayern",
-      "chart_entry": "Zahnreinigung durchgeführt",
-      "service_codes": ["01", "1040"]
-    },
-    {
-      "date": "2022-01-18",
-      "patient_id": 2,
-      "insurance_status": "GKV",
       "insurance_name": "DAK Gesundheit",
-      "chart_entry": "Füllungstherapie Zahn 36",
-      "service_codes": ["13b"]
-    },
-    {
-      "date": "2022-01-18",
-      "patient_id": 3,
-      "insurance_status": "GKV",
-      "insurance_name": "Techniker Krankenkasse",
-      "chart_entry": "Röntgenaufnahme OPG",
-      "service_codes": ["Ä935"]
-    },
-    {
-      "date": "2022-01-18",
-      "patient_id": 4,
-      "insurance_status": "PKV",
-      "insurance_name": "PRIVAT",
-      "chart_entry": "Beratung Zahnersatz",
+      "chart_entry": "Ausführliche Aufklärung über Mundhygiene und Putztechnik,",
       "service_codes": []
     },
     {
       "date": "2022-01-18",
-      "patient_id": 5,
+      "patient_id": 1,
       "insurance_status": "GKV",
-      "insurance_name": "Barmer",
-      "chart_entry": "Professionelle Zahnreinigung",
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Kontrolle,",
+      "service_codes": []
+    },
+    {
+      "date": "2022-01-18",
+      "patient_id": 1,
+      "insurance_status": "GKV",
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Kontrolle,",
       "service_codes": []
     }
   ]

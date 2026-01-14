@@ -1,437 +1,336 @@
 # Quick Reference
 
-**Complete Developer Reference for Ivoris Multi-Center Pipeline**
+**Developer Reference for Both Ivoris Projects**
+
+> **Unified Presentation:** This reference covers both `ivoris-pipeline` (main challenge) and `ivoris-multi-center` (extension).
+
+---
+
+## The Two Projects
+
+| Project | Type | Location | Purpose |
+|---------|------|----------|---------|
+| **ivoris-pipeline** | Main Challenge | `sandbox/ivoris-pipeline` | Daily extraction from ONE database |
+| **ivoris-multi-center** | Extension | `sandbox/ivoris-multi-center` | 30 databases with random schemas |
+
+---
+
+## Database Architecture
+
+### Docker Containers
+
+| Container | Port | Project | Databases |
+|-----------|------|---------|-----------|
+| `ivoris-sqlserver` | 1433 | ivoris-pipeline | 1 (`DentalDB`) |
+| `ivoris-multi-sqlserver` | 1434 | ivoris-multi-center | 30 (`DentalDB_01`-`DentalDB_30`) |
+
+### Why 30 Databases?
+
+The multi-center extension demonstrates **real-world scale**:
+
+- **30 dental centers** across Germany (20), Austria (5), Switzerland (5)
+- **Each center = separate database** (production isolation)
+- **Each database has RANDOM schema names** (the hard problem)
+- **Same logical tables, different physical names**
+
+```
+DentalDB_01: KARTEI_MN   → columns: PATNR_NAN6, DATUM_3A4
+DentalDB_02: KARTEI_8Y   → columns: PATNR_DZ,   DATUM_QW2
+DentalDB_30: KARTEI_LA   → columns: PATNR_BE,   DATUM_ZH
+```
+
+> "You can't write one SQL query that works everywhere. Each center needs its own mapping."
+
+---
+
+## ivoris-pipeline Commands
+
+**Location:** `~/Projects/outre_base/sandbox/ivoris-pipeline`
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-pipeline
+
+# Setup (from scratch)
+docker-compose up -d && sleep 30    # Start SQL Server
+./scripts/restore-database.sh       # Restore DentalDB from backup
+pip install -r requirements.txt     # Install dependencies
+
+# Daily usage
+python src/main.py --test-connection           # Test DB connection
+python src/main.py --daily-extract             # Extract yesterday's data
+python src/main.py --daily-extract --date 2022-01-18  # Specific date
+python src/main.py --daily-extract --format csv       # CSV output
+python src/main.py --daily-extract --format json      # JSON output
+
+# View output
+cat data/output/ivoris_chart_entries_2022-01-18.json
+cat data/output/ivoris_chart_entries_2022-01-18.csv
+```
+
+### ivoris-pipeline Output Format
+
+```json
+{
+  "extraction_timestamp": "2026-01-13T06:00:00",
+  "target_date": "2022-01-18",
+  "record_count": 4,
+  "entries": [
+    {
+      "date": "2022-01-18",
+      "patient_id": 1,
+      "insurance_status": "GKV",
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Kontrolle, Befund unauffällig",
+      "service_codes": ["01", "Ä1"]
+    }
+  ]
+}
+```
+
+### Required Fields (Main Challenge)
+
+| Field | German | Source |
+|-------|--------|--------|
+| date | Datum | KARTEI.DATUM |
+| patient_id | Pat-ID | KARTEI.PATNR |
+| insurance_status | Versicherungsstatus | KASSEN.ART |
+| chart_entry | Karteikarteneintrag | KARTEI.BEMERKUNG |
+| service_codes | Leistungen | LEISTUNG.LEISTUNG |
+
+---
+
+## ivoris-multi-center Commands
+
+**Location:** `~/Projects/outre_base/sandbox/ivoris-multi-center`
+
+```bash
+cd ~/Projects/outre_base/sandbox/ivoris-multi-center
+
+# Setup (from scratch)
+docker-compose up -d && sleep 30         # Start SQL Server
+python scripts/generate_test_dbs.py      # Generate 30 random-schema databases
+pip install -r requirements.txt          # Install dependencies
+python -m src.cli generate-mappings      # Create mapping files
+
+# Daily usage
+python -m src.cli list                   # Show all 30 centers
+python -m src.cli benchmark              # Performance test (target: <5s)
+python -m src.cli web                    # Start web UI
+```
+
+> **Full multi-center reference continues below...**
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Docker & SQL Server](#docker--sql-server)
-3. [Database Deep Dive](#database-deep-dive)
-4. [CLI Commands Reference](#cli-commands-reference)
-5. [Python Code Examples](#python-code-examples)
-6. [Project Architecture](#project-architecture)
-7. [File-by-File Reference](#file-by-file-reference)
-8. [Data Flow](#data-flow)
-9. [Web UI API](#web-ui-api)
-10. [Troubleshooting](#troubleshooting)
+1. [Quick Start Commands](#quick-start-commands)
+2. [Docker & Database](#docker--database)
+3. [CLI Commands](#cli-commands)
+4. [Database Exploration](#database-exploration)
+5. [Web UI](#web-ui)
+6. [Project Structure](#project-structure)
+7. [Key Files Reference](#key-files-reference)
+8. [The Story (For Presentation)](#the-story-for-presentation)
 
 ---
 
-## Quick Start
-
-### From Zero to Demo (5 minutes)
+## Quick Start Commands
 
 ```bash
-# 1. Navigate
+# Navigate to project
 cd sandbox/ivoris-multi-center
 
-# 2. Start SQL Server
-docker-compose up -d
+# Full setup (from scratch)
+docker-compose up -d          # 1. Start SQL Server
+sleep 30                       # 2. Wait for SQL Server
+pip install -r requirements.txt  # 3. Install dependencies
+python scripts/generate_test_dbs.py  # 4. Generate 30 databases with random schemas
+python -m src.cli generate-mappings  # 5. Create mapping files
 
-# 3. Wait for it
-sleep 30
-
-# 4. Install Python deps
-pip install -r requirements.txt
-
-# 5. Generate 30 databases with random schemas
-python scripts/generate_test_dbs.py
-
-# 6. Generate mapping files
-python -m src.cli generate-mappings
-
-# 7. Verify
-python -m src.cli list
-python -m src.cli benchmark
-```
-
-### Daily Development
-
-```bash
-# Start Docker (if not running)
-docker-compose up -d
-
-# Run benchmark
-python -m src.cli benchmark
-
-# Start web UI
-python -m src.cli web
-# Open http://localhost:8000
+# Daily workflow
+python -m src.cli benchmark    # Run performance test
+python -m src.cli web          # Start web UI at http://localhost:8000
 ```
 
 ---
 
-## Docker & SQL Server
+## Docker & Database
 
-### Container Management
+### Start/Stop SQL Server
 
 ```bash
-# Start container
+# Start SQL Server container
 docker-compose up -d
 
-# Check status
+# Check if running
 docker ps | grep ivoris-multi-sqlserver
 
 # View logs
 docker logs ivoris-multi-sqlserver
-docker logs -f ivoris-multi-sqlserver  # Follow
 
-# Stop container
+# Stop SQL Server
 docker-compose down
 
-# Full reset (delete data)
+# Stop and remove volumes (full reset)
 docker-compose down -v
 ```
 
 ### Connection Details
 
-| Property | Value |
-|----------|-------|
-| **Host** | `localhost` |
-| **Port** | `1434` (mapped from 1433) |
-| **User** | `sa` |
-| **Password** | `MultiCenter@2024` |
-| **Driver** | `ODBC Driver 18 for SQL Server` |
-| **Container Name** | `ivoris-multi-sqlserver` |
+| Setting | Value |
+|---------|-------|
+| **Host** | localhost |
+| **Port** | 1434 |
+| **User** | sa |
+| **Password** | Clinero2026 |
+| **Driver** | ODBC Driver 18 for SQL Server |
 
-### Connection String (Python)
-
-```python
-conn_str = (
-    "DRIVER={ODBC Driver 18 for SQL Server};"
-    "SERVER=localhost,1434;"
-    "DATABASE=DentalDB_01;"
-    "UID=sa;"
-    "PWD=MultiCenter@2024;"
-    "TrustServerCertificate=yes;"
-)
-```
-
-### docker-compose.yml Explained
-
-```yaml
-# File: docker-compose.yml
-services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2019-latest
-    platform: linux/amd64                    # Required for Apple Silicon
-    container_name: ivoris-multi-sqlserver
-    user: root                               # Required for volume permissions
-    environment:
-      - ACCEPT_EULA=Y                        # Required license acceptance
-      - SA_PASSWORD=MultiCenter@2024         # SA password
-      - MSSQL_PID=Developer                  # Free developer edition
-    ports:
-      - "1434:1433"                           # Host:Container
-    volumes:
-      - sqlserver_data:/var/opt/mssql/data   # Persistent storage
-```
-
----
-
-## Database Deep Dive
-
-### Database Structure
-
-Each center has its own database:
-
-| Center ID | Database Name | Sample Table |
-|-----------|---------------|--------------|
-| center_01 | DentalDB_01 | KARTEI_MN |
-| center_02 | DentalDB_02 | KARTEI_8Y |
-| ... | ... | ... |
-| center_30 | DentalDB_30 | KARTEI_XQ4 |
-
-### Schema: `ck`
-
-All tables are in the `ck` schema (Clinero Kartei):
-
-```sql
-ck.PATIENT_XYZ     -- Patients
-ck.KASSEN_ABC      -- Insurance providers
-ck.PATKASSE_DEF    -- Patient-insurance links
-ck.KARTEI_GHI      -- Chart entries (main table)
-ck.LEISTUNG_JKL    -- Services/procedures
-```
-
-### Canonical vs Actual Names
-
-**Canonical** (what we want):
-```
-PATIENT.ID, PATIENT.P_NAME, PATIENT.P_VORNAME
-KARTEI.PATNR, KARTEI.DATUM, KARTEI.BEMERKUNG
-```
-
-**Actual** (what's in the database - random per center):
-```
-PATIENT_X7K.ID, PATIENT_X7K.P_NAME_QW2, PATIENT_X7K.P_VORNAME_8M
-KARTEI_MN.PATNR_NAN6, KARTEI_MN.DATUM_3A4, KARTEI_MN.BEMERKUNG_R5
-```
-
-### SQL: Connect via Container
+### Connect with sqlcmd (inside container)
 
 ```bash
 # Enter container
 docker exec -it ivoris-multi-sqlserver /bin/bash
 
-# Run sqlcmd
-/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "MultiCenter@2024" -C
-```
+# Connect with sqlcmd
+/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Clinero2026" -C
 
-### SQL: Useful Queries
-
-```sql
--- List all databases
-SELECT name FROM sys.databases WHERE database_id > 4;
+# List databases
+SELECT name FROM sys.databases;
 GO
 
--- Use specific database
+# Use a specific database
 USE DentalDB_01;
 GO
 
--- List tables in ck schema
-SELECT TABLE_NAME
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'ck';
+# Show tables
+SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ck';
 GO
 
--- Show columns for a table
-SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'KARTEI_MN';
-GO
-
--- Sample data from chart table
-SELECT TOP 5 * FROM ck.KARTEI_MN;
-GO
-
--- Count entries per date
-SELECT DATUM_3A4 as datum, COUNT(*) as entries
-FROM ck.KARTEI_MN
-GROUP BY DATUM_3A4;
-GO
-
--- Join patient with chart (using actual column names)
-SELECT
-    p.P_NAME_QW2 as patient_name,
-    k.DATUM_3A4 as date,
-    k.BEMERKUNG_R5 as entry
-FROM ck.PATIENT_X7K p
-JOIN ck.KARTEI_MN k ON p.ID = k.PATNR_NAN6
-WHERE k.DATUM_3A4 = 20220118;
+# Show columns for a table
+SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'KARTEI_XYZ';
 GO
 ```
 
-### SQL: Cross-Database Query
+### Connect with Python (quick test)
 
-```sql
--- Query across all databases (from master)
-USE master;
-GO
+```python
+import pyodbc
 
--- Dynamic query to count tables per database
-DECLARE @sql NVARCHAR(MAX) = '';
-SELECT @sql = @sql +
-    'SELECT ''' + name + ''' as db, COUNT(*) as tables FROM ' +
-    QUOTENAME(name) + '.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''ck'' UNION ALL '
-FROM sys.databases
-WHERE name LIKE 'DentalDB_%';
-SET @sql = LEFT(@sql, LEN(@sql) - 10);  -- Remove last UNION ALL
-EXEC sp_executesql @sql;
-GO
+conn_str = (
+    "DRIVER={ODBC Driver 18 for SQL Server};"
+    "SERVER=localhost,1434;"
+    "DATABASE=DentalDB_01;"
+    "UID=sa;"
+    "PWD=Clinero2026;"
+    "TrustServerCertificate=yes;"
+)
+
+conn = pyodbc.connect(conn_str)
+cursor = conn.cursor()
+
+# List tables in ck schema
+cursor.execute("""
+    SELECT TABLE_NAME
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'ck'
+""")
+
+for row in cursor.fetchall():
+    print(row[0])
 ```
 
 ---
 
-## CLI Commands Reference
+## CLI Commands
 
-### Overview
+All commands use: `python -m src.cli <command>`
 
-All commands: `python -m src.cli <command> [options]`
-
-| Command | Purpose |
-|---------|---------|
-| `list` | Show all 30 centers with mapping status |
-| `discover-raw` | Query INFORMATION_SCHEMA, show raw tables/columns |
-| `generate-mappings` | Create JSON mapping files from discovery |
-| `show-mapping` | Display a center's mapping file |
-| `extract` | Extract chart entries using mappings |
-| `benchmark` | Performance test all centers |
-| `web` | Start FastAPI web UI |
-
-### `list` - Show Centers
+### List Centers
 
 ```bash
+# Show all 30 configured centers with mapping status
 python -m src.cli list
 ```
 
-**Output:**
-```
-============================================================
-Configured Dental Centers
-============================================================
-
-  center_01 [mapped]
-    Name: Zahnarztpraxis München
-    City: München
-    Database: DentalDB_01
-
-  center_02 [mapped]
-    ...
-
-============================================================
-Total: 30 centers
-Mapped: 30 centers
-============================================================
-```
-
-### `discover-raw` - Raw Schema Discovery
+### Discover Raw Schema
 
 ```bash
-# All centers
+# Discover schema for ALL centers
 python -m src.cli discover-raw
 
-# Specific center
+# Discover schema for ONE center
 python -m src.cli discover-raw -c center_01
-python -m src.cli discover-raw --center center_01
+python -m src.cli discover-raw --center center_15
 ```
 
-**Output:**
+Output shows actual table/column names like:
 ```
-============================================================
-Center: Zahnarztpraxis München (center_01)
-Database: DentalDB_01
-============================================================
-
 TABLE: ck.KARTEI_MN
   - ID (int, NOT NULL)
   - PATNR_NAN6 (int, NULL)
   - DATUM_3A4 (int, NULL)
   - BEMERKUNG_X7K (nvarchar, NULL)
   - DELKZ (int, NULL)
-
-TABLE: ck.PATIENT_R2Z
-  ...
 ```
 
-### `generate-mappings` - Create Mapping Files
+### Generate Mappings
 
 ```bash
+# Generate mapping files for all centers
 python -m src.cli generate-mappings
 ```
 
-**Output:**
-```
-============================================================
-Generated 30 mapping files
-============================================================
+Creates JSON files in `data/mappings/`:
+- `center_01_mapping.json`
+- `center_02_mapping.json`
+- ... (30 files)
 
-Files saved to: data/mappings
-IMPORTANT: Review and adjust mappings as needed before extraction.
-Each file has 'reviewed: false' flag - set to true after review.
-```
-
-**Creates:** `data/mappings/center_XX_mapping.json`
-
-### `show-mapping` - View Mapping
+### Show Mapping
 
 ```bash
 # List available mappings
 python -m src.cli show-mapping
 
-# Show specific center
+# Show specific center mapping
 python -m src.cli show-mapping center_01
 ```
 
-**Output:**
-```
-============================================================
-Mapping: center_01
-Database: DentalDB_01
-Reviewed: False
-============================================================
-
-KARTEI -> KARTEI_MN
-  PATNR -> PATNR_NAN6
-  DATUM -> DATUM_3A4
-  BEMERKUNG -> BEMERKUNG_X7K
-  ID -> ID
-  DELKZ -> DELKZ
-
-PATIENT -> PATIENT_R2Z
-  P_NAME -> P_NAME_QW2
-  ...
-```
-
-### `extract` - Extract Data
+### Extract Data
 
 ```bash
-# All centers, yesterday
-python -m src.cli extract
-
-# Specific date
+# Extract from ALL centers for specific date
 python -m src.cli extract --date 2022-01-18
-python -m src.cli extract -d 2022-01-18
 
-# Specific center
+# Extract from ONE center
 python -m src.cli extract -c center_01 --date 2022-01-18
 
-# Output format
+# Output formats
 python -m src.cli extract --format json
 python -m src.cli extract --format csv
-python -m src.cli extract --format both  # default
+python -m src.cli extract --format both   # default
 
-# Parallelism
-python -m src.cli extract --workers 10  # default: 5
+# Control parallelism
+python -m src.cli extract --workers 10
 ```
 
-**Output:**
-```
-============================================================
-Extraction Complete
-============================================================
-Date: 2022-01-18
-Centers: 30/30
-Total Entries: 180
-Total Time: 387ms
-============================================================
-JSON: data/output/extraction_2022-01-18.json
-CSV: data/output/extraction_2022-01-18.csv
-```
-
-### `benchmark` - Performance Test
+### Benchmark Performance
 
 ```bash
+# Run benchmark (clears cache, measures full time)
 python -m src.cli benchmark
+
+# With more workers
 python -m src.cli benchmark --workers 10
 ```
 
-**Output:**
-```
-============================================================
-BENCHMARK RESULTS
-============================================================
-Centers: 30
-Total Entries: 180
-Total Time: 423ms
-============================================================
+Target: <5 seconds for 30 centers
+Typical: ~380ms with pre-loaded mappings
 
-Per-Center Timing:
-  [ok] Zahnarztpraxis München           23ms  (6 entries)
-  [ok] Dental Klinik Berlin             21ms  (6 entries)
-  ...
-
-============================================================
-PASS: Under 5000ms target
-============================================================
-```
-
-### `web` - Start Web UI
+### Web UI
 
 ```bash
-# Default (port 8000)
+# Start web server (default port 8000)
 python -m src.cli web
 
 # Custom port
@@ -439,481 +338,319 @@ python -m src.cli web --port 8080
 
 # Development mode (auto-reload)
 python -m src.cli web --reload
-
-# Specific host
-python -m src.cli web --host 127.0.0.1
 ```
 
-**URLs:**
-- Home: http://localhost:8000
-- Explore: http://localhost:8000/explore
-- Metrics: http://localhost:8000/metrics
-- Schema Diff: http://localhost:8000/schema-diff
+Open: http://localhost:8000
 
 ---
 
-## Python Code Examples
+## Database Exploration
 
-### Connect to Database
+### Understanding the Random Schema
 
-```python
-# File: src/core/config.py (simplified)
+Each center has:
+- **5 tables**: PATIENT, KASSEN, PATKASSE, KARTEI, LEISTUNG
+- **Random suffixes per table**: KARTEI_MN, KARTEI_8Y, KARTEI_XQ4...
+- **Random suffixes per column**: PATNR_NAN6, PATNR_DZ, PATNR_R2Z5...
 
-import pyodbc
+### Canonical Schema (What we expect)
 
-def get_connection(database: str) -> pyodbc.Connection:
-    conn_str = (
-        "DRIVER={ODBC Driver 18 for SQL Server};"
-        "SERVER=localhost,1434;"
-        f"DATABASE={database};"
-        "UID=sa;"
-        "PWD=MultiCenter@2024;"
-        "TrustServerCertificate=yes;"
-    )
-    return pyodbc.connect(conn_str)
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **PATIENT** | Patients | ID, P_NAME, P_VORNAME |
+| **KASSEN** | Insurance providers | ID, NAME, ART |
+| **PATKASSE** | Patient-insurance link | PATNR, KASSENID |
+| **KARTEI** | Chart entries | PATNR, DATUM, BEMERKUNG |
+| **LEISTUNG** | Services | PATIENTID, DATUM, LEISTUNG |
+
+### Example: Raw vs Mapped
+
+**In database (raw):**
+```sql
+SELECT PATNR_NAN6, DATUM_3A4, BEMERKUNG_X7K
+FROM ck.KARTEI_MN
+WHERE DATUM_3A4 = 20220118
 ```
 
-### Discover Schema
-
-```python
-# File: src/core/discovery.py (key method)
-
-def discover(self, schema_filter: str = "ck") -> DiscoveredSchema:
-    conn = self._get_connection()
-    cursor = conn.cursor()
-
-    # Get tables
-    cursor.execute("""
-        SELECT TABLE_NAME
-        FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'
-    """, (schema_filter,))
-
-    tables = []
-    for (table_name,) in cursor.fetchall():
-        # Get columns for each table
-        cursor.execute("""
-            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
-        """, (schema_filter, table_name))
-
-        columns = [
-            DiscoveredColumn(name=row[0], data_type=row[1], ...)
-            for row in cursor.fetchall()
-        ]
-        tables.append(DiscoveredTable(name=table_name, columns=columns))
-
-    return DiscoveredSchema(database=..., tables=tables)
+**What we discover:**
+```
+KARTEI_MN → canonical KARTEI
+PATNR_NAN6 → canonical PATNR
+DATUM_3A4 → canonical DATUM
+BEMERKUNG_X7K → canonical BEMERKUNG
 ```
 
-### Pattern Matching for Mapping
+### Query to See All Tables Across Centers
 
-```python
-# File: src/services/mapping_generator.py (simplified)
-
-CANONICAL_TABLES = ["PATIENT", "KARTEI", "KASSEN", "PATKASSE", "LEISTUNG"]
-CANONICAL_COLUMNS = {
-    "KARTEI": ["PATNR", "DATUM", "BEMERKUNG", "ID", "DELKZ"],
-    "PATIENT": ["P_NAME", "P_VORNAME", "ID", "DELKZ"],
-    ...
-}
-
-def extract_base_name(actual_name: str) -> str:
-    """KARTEI_MN -> KARTEI, PATNR_NAN6 -> PATNR"""
-    # Try to match against canonical names
-    for canonical in CANONICAL_TABLES + flatten(CANONICAL_COLUMNS.values()):
-        if actual_name.startswith(canonical + "_") or actual_name == canonical:
-            return canonical
-    return None
-
-def generate_mapping(discovered: DiscoveredSchema) -> dict:
-    mapping = {"tables": {}}
-
-    for table in discovered.tables:
-        canonical = extract_base_name(table.name)
-        if canonical:
-            mapping["tables"][canonical] = {
-                "actual_name": table.name,
-                "columns": {}
-            }
-            for col in table.columns:
-                col_canonical = extract_base_name(col.name)
-                if col_canonical:
-                    mapping["tables"][canonical]["columns"][col_canonical] = {
-                        "actual_name": col.name
-                    }
-
-    return mapping
-```
-
-### Build Dynamic SQL
-
-```python
-# File: src/adapters/center_adapter.py (key method)
-
-def extract_chart_entries(self, date: int) -> list[ChartEntry]:
-    """Generate SQL using mapping, execute, return canonical model."""
-
-    # Get actual table/column names from mapping
-    kartei = self.mapping.tables["KARTEI"]
-    patient = self.mapping.tables["PATIENT"]
-    patkasse = self.mapping.tables["PATKASSE"]
-    kassen = self.mapping.tables["KASSEN"]
-
-    sql = f"""
-        SELECT
-            k.{kartei.columns["DATUM"]} as datum,
-            k.{kartei.columns["PATNR"]} as patient_id,
-            kas.{kassen.columns["ART"]} as insurance_status,
-            k.{kartei.columns["BEMERKUNG"]} as entry
-        FROM ck.{kartei.actual_name} k
-        JOIN ck.{patkasse.actual_name} pk ON k.{kartei.columns["PATNR"]} = pk.{patkasse.columns["PATNR"]}
-        JOIN ck.{kassen.actual_name} kas ON pk.{patkasse.columns["KASSENID"]} = kas.ID
-        WHERE k.{kartei.columns["DATUM"]} = ?
-          AND k.DELKZ = 0
-    """
-
-    cursor = self.conn.cursor()
-    cursor.execute(sql, (date,))
-
-    return [
-        ChartEntry(
-            date=row.datum,
-            patient_id=row.patient_id,
-            insurance_status=row.insurance_status,
-            chart_entry=row.entry
-        )
-        for row in cursor.fetchall()
-    ]
-```
-
-### Parallel Extraction
-
-```python
-# File: src/services/extraction.py (key method)
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-def extract_all(self, target_date: date, max_workers: int = 5) -> ExtractionResult:
-    results = []
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(self._extract_center, center, target_date): center
-            for center in self.config.centers
-        }
-
-        for future in as_completed(futures):
-            center = futures[future]
-            try:
-                entries = future.result()
-                results.append(CenterResult(
-                    center_id=center.id,
-                    entries=entries,
-                    duration_ms=...
-                ))
-            except Exception as e:
-                results.append(CenterResult(
-                    center_id=center.id,
-                    entries=[],
-                    error=str(e)
-                ))
-
-    return ExtractionResult(results=results, ...)
+```sql
+-- Connect to master, then:
+EXEC sp_MSforeachdb 'USE [?];
+SELECT DB_NAME() as db, TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = ''ck'''
 ```
 
 ---
 
-## Project Architecture
-
-### High-Level Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          CLI / Web UI                            │
-│  python -m src.cli <cmd>  |  http://localhost:8000              │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       ExtractionService                          │
-│  src/services/extraction.py                                      │
-│  - Parallel execution (ThreadPoolExecutor)                       │
-│  - Aggregates results from all centers                           │
-│  - Exports to JSON/CSV                                           │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-            ┌───────────────────┼───────────────────┐
-            ▼                   ▼                   ▼
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
-│   CenterAdapter   │ │   CenterAdapter   │ │   CenterAdapter   │
-│   center_01       │ │   center_02       │ │   center_N        │
-│ adapters/center_  │ │                   │ │                   │
-│   adapter.py      │ │                   │ │                   │
-└─────────┬─────────┘ └─────────┬─────────┘ └─────────┬─────────┘
-          │                     │                     │
-          ▼                     ▼                     ▼
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
-│  SchemaMapping    │ │  SchemaMapping    │ │  SchemaMapping    │
-│  (from JSON)      │ │  (from JSON)      │ │  (from JSON)      │
-│ core/introspector │ │                   │ │                   │
-└─────────┬─────────┘ └─────────┬─────────┘ └─────────┬─────────┘
-          │                     │                     │
-          ▼                     ▼                     ▼
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
-│   DentalDB_01     │ │   DentalDB_02     │ │   DentalDB_N      │
-│   (SQL Server)    │ │   (SQL Server)    │ │   (SQL Server)    │
-└───────────────────┘ └───────────────────┘ └───────────────────┘
-```
-
-### Data Flow: Discovery → Mapping → Extraction
-
-```
-1. DISCOVERY (discover-raw)
-   Database INFORMATION_SCHEMA
-        │
-        ▼
-   DiscoveredSchema (dataclass)
-   - database: "DentalDB_01"
-   - tables: [DiscoveredTable, ...]
-   - columns: [DiscoveredColumn, ...]
-
-2. MAPPING GENERATION (generate-mappings)
-   DiscoveredSchema
-        │
-        ▼
-   Pattern Matching
-   "KARTEI_MN" → "KARTEI"
-   "PATNR_NAN6" → "PATNR"
-        │
-        ▼
-   JSON Mapping File
-   data/mappings/center_01_mapping.json
-
-3. EXTRACTION (extract)
-   JSON Mapping File
-        │
-        ▼
-   SchemaMapping (dataclass)
-        │
-        ▼
-   CenterAdapter (generates SQL)
-        │
-        ▼
-   ChartEntry[] (canonical model)
-        │
-        ▼
-   JSON/CSV Output
-```
-
----
-
-## File-by-File Reference
-
-### Configuration Layer
-
-| File | Purpose | Key Contents |
-|------|---------|--------------|
-| `config/centers.yml` | Center definitions | 30 centers with id, name, database, city |
-| `docker-compose.yml` | SQL Server container | Port 1434, SA password |
-| `requirements.txt` | Python dependencies | pyodbc, fastapi, uvicorn, pyyaml, jinja2 |
-
-### Core Layer (`src/core/`)
-
-| File | Purpose | Key Classes/Functions |
-|------|---------|----------------------|
-| `config.py` | Load centers.yml | `load_config() -> Config` |
-| `discovery.py` | Raw INFORMATION_SCHEMA queries | `SchemaDiscovery.discover() -> DiscoveredSchema` |
-| `introspector.py` | Load/cache mapping files | `load_mapping(center_id) -> SchemaMapping` |
-| `schema_mapping.py` | Mapping dataclass | `SchemaMapping`, `TableMapping`, `ColumnMapping` |
-
-### Service Layer (`src/services/`)
-
-| File | Purpose | Key Classes/Functions |
-|------|---------|----------------------|
-| `extraction.py` | Parallel extraction | `ExtractionService.extract_all() -> ExtractionResult` |
-| `mapping_generator.py` | Generate mapping JSON | `generate_all_mappings(config, output_dir)` |
-
-### Adapter Layer (`src/adapters/`)
-
-| File | Purpose | Key Classes/Functions |
-|------|---------|----------------------|
-| `center_adapter.py` | SQL generation per center | `CenterAdapter.extract_chart_entries(date) -> list[ChartEntry]` |
-
-### Model Layer (`src/models/`)
-
-| File | Purpose | Key Classes |
-|------|---------|-------------|
-| `chart_entry.py` | Canonical output model | `ChartEntry(date, patient_id, insurance_status, chart_entry)` |
-
-### CLI Layer (`src/cli/`)
-
-| File | Purpose | Key Functions |
-|------|---------|---------------|
-| `main.py` | All CLI commands | `cmd_list`, `cmd_discover_raw`, `cmd_extract`, `cmd_benchmark`, `cmd_web` |
-
-### Web Layer (`src/web/`)
-
-| File | Purpose |
-|------|---------|
-| `app.py` | FastAPI app with routes |
-| `templates/base.html` | Base layout with sidebar |
-| `templates/explore.html` | Center exploration page |
-| `templates/metrics.html` | Benchmark dashboard |
-| `templates/schema_diff.html` | Schema comparison |
-
-### Data Layer (`data/`)
-
-| Directory | Purpose | File Pattern |
-|-----------|---------|--------------|
-| `mappings/` | Discovered → canonical mapping | `center_XX_mapping.json` |
-| `ground_truth/` | What generator actually created | `center_XX_ground_truth.json` |
-| `output/` | Extraction results | `extraction_YYYY-MM-DD.json/csv` |
-
-### Scripts (`scripts/`)
-
-| File | Purpose |
-|------|---------|
-| `generate_test_dbs.py` | Create 30 databases with random schemas |
-
----
-
-## Web UI API
+## Web UI
 
 ### Pages
 
-| Route | Template | Purpose |
-|-------|----------|---------|
-| `GET /` | redirect | Redirects to /explore |
-| `GET /explore` | explore.html | Browse centers, view mappings |
-| `GET /metrics` | metrics.html | Benchmark dashboard |
-| `GET /schema-diff` | schema_diff.html | Compare discovered vs ground truth |
+| Page | URL | Purpose |
+|------|-----|---------|
+| **Explore** | http://localhost:8000/explore | Browse centers, view mappings, extract data |
+| **Metrics** | http://localhost:8000/metrics | Multi-select, benchmark, export results |
+| **Schema Diff** | http://localhost:8000/schema-diff | Compare discovered vs ground truth |
 
-### API Endpoints
+### Explore Page Features
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/centers` | GET | List all centers |
-| `/api/centers/{id}` | GET | Get center details |
-| `/api/centers/{id}/mapping` | GET | Get center's mapping |
-| `/api/centers/{id}/extract` | POST | Extract data for date |
-| `/api/benchmark` | POST | Run benchmark for selected centers |
-| `/api/schema-diff/{id}` | GET | Compare discovered vs ground truth |
+1. Select center from dropdown
+2. View center details (name, city, database)
+3. See schema mapping (canonical → actual)
+4. Extract data for a specific date
+5. View results in table format
 
-### Example API Calls
+### Metrics Dashboard Features
 
-```bash
-# List centers
-curl http://localhost:8000/api/centers
+1. **Select Centers**: Click individual or "Select All"
+2. **Run Benchmark**: Parallel extraction with timing
+3. **View Results**:
+   - Summary cards (centers, entries, duration, pass/fail)
+   - Bar chart visualization
+   - Per-center timing table
+4. **Export**: JSON or CSV download
 
-# Get specific center
-curl http://localhost:8000/api/centers/center_01
+### Schema Diff Features
 
-# Get mapping
-curl http://localhost:8000/api/centers/center_01/mapping
+1. Compare discovered mapping vs ground truth
+2. See accuracy percentage
+3. Table-by-table comparison
+4. Visual indicators (checkmarks for matches)
 
-# Extract data
-curl -X POST http://localhost:8000/api/centers/center_01/extract \
-  -H "Content-Type: application/json" \
-  -d '{"date": "2022-01-18"}'
+---
 
-# Benchmark
-curl -X POST http://localhost:8000/api/benchmark \
-  -H "Content-Type: application/json" \
-  -d '{"center_ids": ["center_01", "center_02"]}'
+## Project Structure
+
 ```
+ivoris-multi-center/
+├── src/
+│   ├── cli/                    # CLI commands
+│   │   └── main.py             # All CLI logic (list, discover, extract...)
+│   │
+│   ├── core/                   # Core components
+│   │   ├── config.py           # Load centers.yml configuration
+│   │   ├── discovery.py        # Raw schema discovery (INFORMATION_SCHEMA)
+│   │   ├── introspector.py     # Load/cache mapping files
+│   │   └── schema_mapping.py   # SchemaMapping dataclass
+│   │
+│   ├── adapters/               # Database adapters
+│   │   └── center_adapter.py   # SQL query generation using mappings
+│   │
+│   ├── services/               # Business logic
+│   │   ├── extraction.py       # Parallel extraction (ThreadPoolExecutor)
+│   │   └── mapping_generator.py # Generate mapping files from discovery
+│   │
+│   ├── models/                 # Data models
+│   │   └── chart_entry.py      # ChartEntry dataclass
+│   │
+│   └── web/                    # Web UI
+│       ├── app.py              # FastAPI application
+│       ├── templates/          # Jinja2 HTML templates
+│       │   ├── base.html       # Base layout with sidebar
+│       │   ├── explore.html    # Center exploration page
+│       │   ├── metrics.html    # Benchmark dashboard
+│       │   └── schema_diff.html # Schema comparison
+│       └── static/             # CSS/JS assets
+│
+├── config/
+│   └── centers.yml             # 30 dental centers configuration
+│
+├── data/
+│   ├── mappings/               # Per-center mapping JSON files
+│   │   ├── center_01_mapping.json
+│   │   └── ...
+│   ├── ground_truth/           # Generator's actual schema (for validation)
+│   │   ├── center_01_ground_truth.json
+│   │   └── ...
+│   └── output/                 # Extraction output (JSON/CSV)
+│
+├── scripts/
+│   └── generate_test_dbs.py    # Creates 30 databases with random schemas
+│
+├── docker-compose.yml          # SQL Server container
+├── requirements.txt            # Python dependencies
+├── README.md                   # Project overview
+├── CHALLENGE.md                # Challenge requirements
+├── ACCEPTANCE.md               # Gherkin acceptance criteria
+└── PRESENTATION.md             # Loom video script
+```
+
+---
+
+## Key Files Reference
+
+### Configuration
+
+| File | Path | Purpose |
+|------|------|---------|
+| Centers config | `config/centers.yml` | All 30 dental centers (id, name, database) |
+| Docker | `docker-compose.yml` | SQL Server container on port 1434 |
+| Dependencies | `requirements.txt` | Python packages |
+
+### Core Logic
+
+| File | Path | Purpose |
+|------|------|---------|
+| CLI | `src/cli/main.py` | All CLI commands |
+| Config loader | `src/core/config.py` | Parse centers.yml |
+| Discovery | `src/core/discovery.py` | Query INFORMATION_SCHEMA |
+| Mapping loader | `src/core/introspector.py` | Load/cache JSON mappings |
+| Schema model | `src/core/schema_mapping.py` | SchemaMapping dataclass |
+
+### Services
+
+| File | Path | Purpose |
+|------|------|---------|
+| Extraction | `src/services/extraction.py` | ThreadPoolExecutor parallel extraction |
+| Mapping gen | `src/services/mapping_generator.py` | Generate mapping files from raw discovery |
+
+### Adapters
+
+| File | Path | Purpose |
+|------|------|---------|
+| Center adapter | `src/adapters/center_adapter.py` | Generate SQL with actual table/column names |
+
+### Data
+
+| File | Path | Purpose |
+|------|------|---------|
+| Mapping files | `data/mappings/<center_id>_mapping.json` | Discovered schema → canonical mapping |
+| Ground truth | `data/ground_truth/<center_id>_ground_truth.json` | What generator actually created |
+| Output | `data/output/` | Extraction results (JSON/CSV) |
+
+---
+
+## The Story (For Presentation)
+
+> **See Also:** [docs/presentation/STORY.md](docs/presentation/STORY.md) for the full 5-act unified narrative.
+
+### The Unified Narrative
+
+| Act | Project | Key Message |
+|-----|---------|-------------|
+| **Act 1: The Ask** | pipeline | Original German requirement, 5 fields |
+| **Act 2: The Solution** | pipeline | Clean extraction, CSV/JSON output |
+| **Act 3: The Pivot** | - | "But what about 30 centers with random schemas?" |
+| **Act 4: The Extension** | multi-center | Pattern-based discovery, parallel extraction |
+| **Act 5: The Proof** | multi-center | 466ms for 30 centers, 10x faster than target |
+
+### The Pivot Line (Memorize This!)
+
+> "So the main challenge is done. But then I started thinking... Clinero doesn't manage one dental practice. They manage many. And here's the thing about Ivoris: each installation can have **randomly generated** table and column names. Let me show you."
+
+### Act 4 Detail: The Multi-Center Problem
+
+> "30 dental centers across Germany, Austria, and Switzerland. Same software, but each has a **randomly generated schema**. Tables like `KARTEI_MN`, `KARTEI_8Y` - every center different. Columns too: `PATNR_NAN6`, `PATNR_DZ`. No pattern across centers."
+
+**Key point**: Can't write static SQL. Need dynamic schema discovery.
+
+### Act 4 Detail: The Solution Architecture
+
+```
+Raw Discovery → Mapping Files → Parallel Extraction → Unified Output
+```
+
+1. **Raw Discovery** (`src/core/discovery.py`)
+   - Query `INFORMATION_SCHEMA.TABLES` and `INFORMATION_SCHEMA.COLUMNS`
+   - No interpretation, just facts
+
+2. **Mapping Generator** (`src/services/mapping_generator.py`)
+   - Pattern matching: `KARTEI_XYZ` → `KARTEI`
+   - Creates JSON mapping files with `reviewed: false`
+
+3. **Manual Review Workflow**
+   - Human reviews mapping files
+   - Sets `reviewed: true` when verified
+
+4. **Parallel Extraction** (`src/services/extraction.py`)
+   - ThreadPoolExecutor for concurrent database access
+   - Each center uses its own mapping
+
+5. **Unified Output**
+   - Same canonical format regardless of source schema
+   - JSON and CSV exports
+
+### Act 3: Live Demo Flow
+
+1. **Show the centers**: `python -m src.cli list`
+2. **Raw discovery**: `python -m src.cli discover-raw -c center_01`
+3. **View mapping**: `python -m src.cli show-mapping center_01`
+4. **Extract data**: `python -m src.cli extract --date 2022-01-18 -c center_01`
+5. **Benchmark**: `python -m src.cli benchmark`
+6. **Web UI**: `python -m src.cli web` → http://localhost:8000
+
+### Act 4: The Results
+
+- **30 centers** with random schemas
+- **Pattern-based discovery** works for all
+- **Manual review workflow** for production safety
+- **<500ms** for 30 centers (target was <5s)
+- **Web UI** for exploration and metrics
+
+### Key Technical Decisions
+
+| Decision | Why |
+|----------|-----|
+| JSON mapping files | Human-readable, version-controllable |
+| `reviewed: false` flag | Production safety, human approval |
+| Ground truth separation | Validate discovery accuracy |
+| ThreadPoolExecutor | Simple parallelism, good enough for 30 |
+| FastAPI + Jinja2 | Quick to build, familiar patterns |
 
 ---
 
 ## Troubleshooting
 
-### Docker Issues
+### SQL Server won't start
 
 ```bash
-# Container won't start
-docker logs ivoris-multi-sqlserver
-
-# Port already in use
+# Check if port 1434 is in use
 lsof -i :1434
-# Kill process or change port in docker-compose.yml
+
+# Check Docker logs
+docker logs ivoris-multi-sqlserver
 
 # Full reset
 docker-compose down -v
 docker-compose up -d
-sleep 30
 ```
 
-### Database Issues
+### No mapping files found
 
 ```bash
-# Connection refused
-# 1. Check Docker is running
-docker ps | grep ivoris
-
-# 2. Check port
-nc -zv localhost 1434
-
-# 3. Check credentials
-python -c "
-import pyodbc
-conn = pyodbc.connect(
-    'DRIVER={ODBC Driver 18 for SQL Server};'
-    'SERVER=localhost,1434;DATABASE=master;'
-    'UID=sa;PWD=MultiCenter@2024;TrustServerCertificate=yes;'
-)
-print('Connected!')
-"
+# Generate them
+python -m src.cli generate-mappings
 ```
 
-### ODBC Driver Issues
+### ODBC Driver not found
 
 ```bash
-# Check installed drivers
-odbcinst -q -d
-
-# Install on macOS
+# macOS (Homebrew)
 brew install microsoft/mssql-release/msodbcsql18
 
-# Install on Ubuntu
-curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
-apt-get update
-ACCEPT_EULA=Y apt-get install -y msodbcsql18
+# Or check installed drivers
+odbcinst -q -d
 ```
 
-### Python Issues
+### Python import errors
 
 ```bash
-# Import errors
-cd sandbox/ivoris-multi-center  # Must be in project root
+# Make sure you're in the right directory
+cd sandbox/ivoris-multi-center
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Module not found
-python -m src.cli list  # Use -m, not direct path
-```
-
-### Mapping Issues
-
-```bash
-# No mapping files
-python -m src.cli generate-mappings
-
-# Mapping accuracy issues
-python -m src.cli show-mapping center_01
-# Compare with ground truth in data/ground_truth/
-```
-
-### Web UI Issues
-
-```bash
-# Port in use
-pkill -f uvicorn
-python -m src.cli web
-
-# Template errors
-# Check src/web/templates/ for syntax errors
-
-# Static files not loading
-# Check src/web/static/ exists
+# Run as module
+python -m src.cli <command>
 ```

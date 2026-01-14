@@ -163,7 +163,7 @@ async def authorize_center_access(user: User, center_id: str):
 
 ```python
 # SA account - NOT for production
-conn_str = "UID=sa;PWD=MultiCenter@2024;"
+conn_str = "UID=sa;PWD=Clinero2026;"
 ```
 
 #### Production
@@ -192,7 +192,7 @@ conn_str = (
 ```yaml
 # config/centers.yml - INSECURE for production
 database:
-  password: MultiCenter@2024  # Hardcoded!
+  password: Clinero2026  # Hardcoded!
 ```
 
 ### Production Implementation
@@ -253,7 +253,7 @@ env:
 
 ```python
 # NEVER commit these:
-password = "MultiCenter@2024"      # ❌ Hardcoded password
+password = "Clinero2026"      # ❌ Hardcoded password
 api_key = "sk-abc123..."           # ❌ API key
 private_key = "-----BEGIN RSA..."  # ❌ Private key
 

@@ -21,202 +21,165 @@ Extract these 5 fields daily:
 
 ---
 
-## Mapping Requirements to Tables
+## Mapping Requirements to Real Schema
 
 ### Field 1: Datum (Date)
 
-**Search:** Which tables have a date column?
-
 ```sql
-SELECT TABLE_NAME, COLUMN_NAME
+-- Which tables have date-like columns?
+SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE DATA_TYPE = 'date'
+WHERE TABLE_SCHEMA = 'ck'
+  AND (COLUMN_NAME LIKE '%DATUM%' OR COLUMN_NAME LIKE '%DATE%')
 ORDER BY TABLE_NAME;
 GO
 ```
 
-**Result:**
-```
-TABLE_NAME  COLUMN_NAME
-----------  -----------
-KARTEI      DATUM         ← Chart entry date
-LEISTUNG    DATUM         ← Service date
-PATIENT     GEBDAT        ← Birth date (not relevant)
-```
+**Found:** `ck.KARTEI.DATUM` (VARCHAR 8, format YYYYMMDD)
 
-**Decision:** Use `KARTEI.DATUM` - the date of the chart entry.
+**Important:** Need to convert from `'20220118'` to `'2022-01-18'`
 
 ---
 
 ### Field 2: Pat-ID (Patient ID)
 
-**Search:** Which tables have PATIENTID?
-
 ```sql
-SELECT TABLE_NAME, COLUMN_NAME
+-- Where is patient ID referenced?
+SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE COLUMN_NAME LIKE '%PATIENT%'
-ORDER BY TABLE_NAME;
+WHERE TABLE_SCHEMA = 'ck'
+  AND (COLUMN_NAME LIKE '%PAT%' OR COLUMN_NAME = 'ID')
+  AND TABLE_NAME IN ('KARTEI', 'PATIENT', 'LEISTUNG', 'PATKASSE')
+ORDER BY TABLE_NAME, COLUMN_NAME;
 GO
 ```
 
-**Result:**
-```
-TABLE_NAME  COLUMN_NAME
-----------  -----------
-KARTEI      PATIENTID
-LEISTUNG    PATIENTID
-PATIENT     PATIENTID
-```
+**Found:**
+- `ck.KARTEI.PATNR` → references patient
+- `ck.PATIENT.ID` → patient primary key
+- `ck.LEISTUNG.PATIENTID` → references patient (different name!)
 
-**Decision:** Use `KARTEI.PATIENTID` - directly from the chart entry.
+**Decision:** Use `ck.KARTEI.PATNR` as our patient_id
 
 ---
 
 > **💬 Talking Points - Insurance Status**
-> - "This is the interesting one - insurance status requires a JOIN"
+> - "This is the interesting one - insurance status requires TWO joins"
 > - "GKV = public insurance, PKV = private insurance, NULL = self-pay"
-> - "Understanding German healthcare system helps here"
+> - "The ART column uses codes, not simple G/P values"
 
 ### Field 3: Versicherungsstatus (Insurance Status)
 
-**Search:** Where is insurance information?
-
 ```sql
--- Look at KASSE table
-SELECT * FROM KASSE;
+-- Look at insurance type distribution
+SELECT ART, COUNT(*) as cnt
+FROM ck.KASSEN
+WHERE DELKZ = 0 OR DELKZ IS NULL
+GROUP BY ART
+ORDER BY cnt DESC;
 GO
 ```
 
-**Result:**
-```
-KASSEID  NAME                   TYP
--------  ---------------------  ---
-1        AOK Bayern             G
-2        DAK Gesundheit         G
-3        Techniker Krankenkasse G
-4        PRIVAT                 P
-5        Debeka                 P
-```
-
-**TYP values:**
-- `G` = GKV (Gesetzliche Krankenversicherung) - Public
-- `P` = PKV (Private Krankenversicherung) - Private
-- `NULL` = Selbstzahler (Self-payer)
+**ART values discovered:**
+- `'P'` = PKV (Private insurance) - 54 records
+- `'1'` to `'9'` = Various GKV types (public insurance) - ~30,000 records
+- Other codes (B, C, D, etc.) = Special cases
 
 **Path to insurance:**
 ```
-KARTEI.PATIENTID → PATIENT.PATIENTID
-PATIENT.KASSEID → KASSE.KASSEID
-KASSE.TYP → Insurance type
+ck.KARTEI.PATNR → ck.PATKASSE.PATNR
+ck.PATKASSE.KASSENID → ck.KASSEN.ID
+ck.KASSEN.ART → Insurance type code
 ```
 
-**Decision:** Join KARTEI → PATIENT → KASSE, use `KASSE.TYP`
+**Decision:**
+- `ART = 'P'` → PKV
+- `ART IN ('1'-'9')` → GKV
+- `NULL` or no match → Selbstzahler
 
 ---
 
 ### Field 4: Karteikarteneintrag (Chart Entry)
 
-**Search:** Which column contains medical notes?
-
 ```sql
-SELECT TOP 3 EINTRAG FROM KARTEI;
+-- Find the text column in KARTEI
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'ck' AND TABLE_NAME = 'KARTEI'
+  AND DATA_TYPE IN ('varchar', 'nvarchar', 'text')
+  AND (CHARACTER_MAXIMUM_LENGTH > 100 OR CHARACTER_MAXIMUM_LENGTH = -1);
 GO
 ```
 
-**Result:**
-```
-EINTRAG
------------------------------------------
-Kontrolle, Befund unauffällig
-Zahnreinigung durchgeführt
-Füllungstherapie Zahn 36
-```
+**Found:** `ck.KARTEI.BEMERKUNG` (varchar MAX)
 
-**Decision:** Use `KARTEI.EINTRAG`
+**Note:** Column is called `BEMERKUNG` (remark), not `EINTRAG` (entry)!
 
 ---
 
 > **💬 Talking Points - Service Codes**
 > - "One patient visit can have multiple services - we need aggregation"
-> - "STRING_AGG is like Python's ', '.join() - concatenates values"
-> - "This is the trickiest part of the query"
+> - "STRING_AGG combines them into one comma-separated string"
+> - "Watch out: LEISTUNG uses PATIENTID, but KARTEI uses PATNR"
 
 ### Field 5: Leistungen (Service Codes)
 
-**Search:** Where are service codes?
-
 ```sql
-SELECT TOP 5 * FROM LEISTUNG;
+-- Sample service codes
+SELECT TOP 10 PATIENTID, DATUM, LEISTUNG
+FROM ck.LEISTUNG
+WHERE (DELKZ = 0 OR DELKZ IS NULL)
+ORDER BY DATUM DESC;
 GO
 ```
 
-**Result:**
-```
-LEISTUNGID  PATIENTID  DATUM       LEISTUNG
-----------  ---------  ----------  --------
-1           1          2022-01-18  01
-2           1          2022-01-18  1040
-3           2          2022-01-18  13b
-4           3          2022-01-18  Ä935
-```
+**Found:** `ck.LEISTUNG.LEISTUNG` contains codes like '01', '1040', 'Ä935'
 
-**Challenge:** One chart entry can have multiple services.
+**Challenge:** Multiple services per patient per date - need `STRING_AGG()`
 
+**Join condition:**
 ```sql
--- Count services per patient per date
-SELECT PATIENTID, DATUM, COUNT(*) as SERVICE_COUNT
-FROM LEISTUNG
-GROUP BY PATIENTID, DATUM
-ORDER BY PATIENTID, DATUM;
-GO
+WHERE l.PATIENTID = k.PATNR  -- Note: different column names!
+  AND l.DATUM = k.DATUM
 ```
-
-**Result:**
-```
-PATIENTID  DATUM       SERVICE_COUNT
----------  ----------  -------------
-1          2022-01-18  2
-2          2022-01-18  1
-3          2022-01-18  1
-```
-
-**Decision:** Aggregate services into comma-separated list using `STRING_AGG()`
 
 ---
 
-## Summary: Table Mapping
+## Summary: Real Schema Mapping
 
-| Requirement | Source |
-|-------------|--------|
-| Datum | `KARTEI.DATUM` |
-| Pat-ID | `KARTEI.PATIENTID` |
-| Versicherungsstatus | `KASSE.TYP` (via PATIENT) |
-| Karteikarteneintrag | `KARTEI.EINTRAG` |
-| Leistungen | `LEISTUNG.LEISTUNG` (aggregated) |
+| Requirement | Real Source | Notes |
+|-------------|-------------|-------|
+| Datum | `ck.KARTEI.DATUM` | VARCHAR(8), needs formatting |
+| Pat-ID | `ck.KARTEI.PATNR` | INT |
+| Versicherungsstatus | `ck.KASSEN.ART` via PATKASSE | 'P'=PKV, 1-9=GKV |
+| Karteikarteneintrag | `ck.KARTEI.BEMERKUNG` | VARCHAR(MAX) |
+| Leistungen | `ck.LEISTUNG.LEISTUNG` | Aggregated with STRING_AGG |
 
 ---
 
 > **💬 Talking Points - JOIN Strategy**
 > - "KARTEI is our starting point - that's where the chart entries are"
-> - "LEFT JOIN preserves all chart entries even if no insurance or services"
-> - "This is a 3-table JOIN plus a correlated subquery"
+> - "We need PATKASSE as a bridge to get insurance info"
+> - "LEFT JOINs preserve entries even if no insurance or services"
 
-## Join Path
+## Join Path (Real Schema)
 
 ```
-KARTEI (main table)
-  ├── JOIN PATIENT ON KARTEI.PATIENTID = PATIENT.PATIENTID
-  │     └── LEFT JOIN KASSE ON PATIENT.KASSEID = KASSE.KASSEID
-  └── LEFT JOIN LEISTUNG ON KARTEI.PATIENTID = LEISTUNG.PATIENTID
-                        AND KARTEI.DATUM = LEISTUNG.DATUM
+ck.KARTEI (main table)
+  │
+  ├── JOIN ck.PATKASSE ON KARTEI.PATNR = PATKASSE.PATNR
+  │     │
+  │     └── LEFT JOIN ck.KASSEN ON PATKASSE.KASSENID = KASSEN.ID
+  │
+  └── Subquery: ck.LEISTUNG WHERE PATIENTID = KARTEI.PATNR AND DATUM = KARTEI.DATUM
 ```
 
-**Why LEFT JOIN for KASSE?**
+**Why PATKASSE junction?**
+- Patient can have multiple insurance records over time
+- Links patient to their current insurance
+
+**Why LEFT JOINs?**
 - Some patients may have no insurance (Selbstzahler)
-- We don't want to lose those records
-
-**Why LEFT JOIN for LEISTUNG?**
 - Some chart entries may have no services
 - We still want those entries in output
 
@@ -225,11 +188,31 @@ KARTEI (main table)
 ## Insurance Status Logic
 
 ```sql
-CASE KASSE.TYP
-    WHEN 'G' THEN 'GKV'
-    WHEN 'P' THEN 'PKV'
+CASE
+    WHEN ka.ART = 'P' THEN 'PKV'
+    WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
     ELSE 'Selbstzahler'
 END AS insurance_status
+```
+
+---
+
+## Date Formatting Logic
+
+```sql
+-- Convert YYYYMMDD to YYYY-MM-DD
+SUBSTRING(k.DATUM, 1, 4) + '-' +
+SUBSTRING(k.DATUM, 5, 2) + '-' +
+SUBSTRING(k.DATUM, 7, 2) AS date
+```
+
+---
+
+## Don't Forget: Soft Delete Filter!
+
+Every query must include:
+```sql
+WHERE (DELKZ = 0 OR DELKZ IS NULL)
 ```
 
 ---

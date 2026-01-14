@@ -480,7 +480,7 @@ python -m src.cli generate-mappings  # Processes all at once
 
 ```python
 # Development (current)
-conn_str = f"UID=sa;PWD=MultiCenter@2024;TrustServerCertificate=yes;"
+conn_str = f"UID=sa;PWD=Clinero2026;TrustServerCertificate=yes;"
 
 # Production
 conn_str = (

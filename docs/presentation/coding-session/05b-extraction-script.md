@@ -133,14 +133,13 @@ print('Connected!' if db.test_connection() else 'Failed!')
 ```python
 """Data models for chart entries."""
 from dataclasses import dataclass, asdict
-from datetime import date
 from typing import List, Optional
 
 
 @dataclass
 class ChartEntry:
     """Represents a single chart entry extraction."""
-    date: date
+    date: str  # Already formatted as YYYY-MM-DD
     patient_id: int
     insurance_status: str
     insurance_name: Optional[str]
@@ -150,7 +149,7 @@ class ChartEntry:
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
-            "date": self.date.isoformat() if self.date else None,
+            "date": self.date,
             "patient_id": self.patient_id,
             "insurance_status": self.insurance_status,
             "insurance_name": self.insurance_name or "",
@@ -162,9 +161,10 @@ class ChartEntry:
 ---
 
 > **💬 Talking Points - Extraction Service**
-> - "The SQL query is the same one we built manually"
-> - "We parse the comma-separated service codes into a Python list"
-> - "ensure_ascii=False preserves German characters like ü and ö"
+> - "The SQL query uses the REAL Ivoris schema we discovered"
+> - "Tables are in the `ck` schema - not `dbo`!"
+> - "We must filter soft-deleted rows with DELKZ everywhere"
+> - "Date conversion from YYYYMMDD to YYYY-MM-DD happens in SQL"
 
 ## Step 4: Extraction Service (services/daily_extract.py)
 
@@ -183,28 +183,42 @@ from ..models.chart_entry import ChartEntry
 class DailyExtractService:
     """Extracts daily chart entries from Ivoris database."""
 
+    # Real Ivoris schema query:
+    # - Tables in 'ck' schema
+    # - PATNR (not PATIENTID) in KARTEI
+    # - BEMERKUNG (not EINTRAG) for chart entry
+    # - PATKASSE junction table for insurance link
+    # - ART values: 'P'=PKV, '1'-'9'=GKV
+    # - DELKZ soft delete flag
+    # - Date stored as VARCHAR(8) YYYYMMDD
+
     EXTRACTION_QUERY = """
     SELECT
-        k.DATUM AS date,
-        k.PATIENTID AS patient_id,
-        CASE ka.TYP
-            WHEN 'G' THEN 'GKV'
-            WHEN 'P' THEN 'PKV'
+        SUBSTRING(k.DATUM, 1, 4) + '-' +
+        SUBSTRING(k.DATUM, 5, 2) + '-' +
+        SUBSTRING(k.DATUM, 7, 2) AS date,
+        k.PATNR AS patient_id,
+        CASE
+            WHEN ka.ART = 'P' THEN 'PKV'
+            WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
             ELSE 'Selbstzahler'
         END AS insurance_status,
         ISNULL(ka.NAME, '') AS insurance_name,
-        k.EINTRAG AS chart_entry,
+        LEFT(ISNULL(k.BEMERKUNG, ''), 500) AS chart_entry,
         ISNULL((
-            SELECT STRING_AGG(l.LEISTUNG, ',')
-            FROM LEISTUNG l
-            WHERE l.PATIENTID = k.PATIENTID
+            SELECT STRING_AGG(l.LEISTUNG, ', ')
+            FROM ck.LEISTUNG l
+            WHERE l.PATIENTID = k.PATNR
               AND l.DATUM = k.DATUM
+              AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
         ), '') AS service_codes
-    FROM KARTEI k
-    JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-    LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-    WHERE k.DATUM = ?
-    ORDER BY k.PATIENTID, k.KARTEIID
+    FROM ck.KARTEI k
+    JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+        AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+    LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+    WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+      AND k.DATUM = ?
+    ORDER BY k.PATNR
     """
 
     def __init__(self, db: DatabaseConnection = None):
@@ -216,18 +230,21 @@ class DailyExtractService:
         """Extract chart entries for a specific date."""
         entries = []
 
+        # Convert date to YYYYMMDD format for the query
+        date_str = target_date.strftime('%Y%m%d')
+
         with self.db.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute(self.EXTRACTION_QUERY, target_date)
+            cursor.execute(self.EXTRACTION_QUERY, date_str)
 
             for row in cursor.fetchall():
                 # Parse service codes from comma-separated string
                 service_codes = []
                 if row.service_codes:
-                    service_codes = [s.strip() for s in row.service_codes.split(",")]
+                    service_codes = [s.strip() for s in row.service_codes.split(", ")]
 
                 entry = ChartEntry(
-                    date=row.date,
+                    date=row.date,  # Already formatted YYYY-MM-DD from SQL
                     patient_id=row.patient_id,
                     insurance_status=row.insurance_status,
                     insurance_name=row.insurance_name,
@@ -275,7 +292,7 @@ class DailyExtractService:
             # Data rows
             for entry in entries:
                 writer.writerow([
-                    entry.date.isoformat() if entry.date else "",
+                    entry.date,
                     entry.patient_id,
                     entry.insurance_status,
                     entry.insurance_name,
@@ -419,7 +436,7 @@ python src/main.py --daily-extract --date 2022-01-18
 **Expected output:**
 ```
 Extracting chart entries for 2022-01-18...
-Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.json
+Saved 4 entries to data/output/ivoris_chart_entries_2022-01-18.json
 Done! Output: data/output/ivoris_chart_entries_2022-01-18.json
 ```
 
@@ -432,7 +449,7 @@ python src/main.py --daily-extract --date 2022-01-18 --format csv
 **Expected output:**
 ```
 Extracting chart entries for 2022-01-18...
-Saved 6 entries to data/output/ivoris_chart_entries_2022-01-18.csv
+Saved 4 entries to data/output/ivoris_chart_entries_2022-01-18.csv
 Done! Output: data/output/ivoris_chart_entries_2022-01-18.csv
 ```
 
@@ -456,27 +473,29 @@ cat data/output/ivoris_chart_entries_2022-01-18.json
 {
   "extraction_timestamp": "2026-01-14T15:30:00.123456",
   "target_date": "2022-01-18",
-  "record_count": 6,
+  "record_count": 4,
   "entries": [
     {
       "date": "2022-01-18",
       "patient_id": 1,
       "insurance_status": "GKV",
-      "insurance_name": "AOK Bayern",
-      "chart_entry": "Kontrolle, Befund unauffällig",
-      "service_codes": ["01", "1040"]
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG",
+      "service_codes": []
     },
     {
       "date": "2022-01-18",
       "patient_id": 1,
       "insurance_status": "GKV",
-      "insurance_name": "AOK Bayern",
-      "chart_entry": "Zahnreinigung durchgeführt",
-      "service_codes": ["01", "1040"]
+      "insurance_name": "DAK Gesundheit",
+      "chart_entry": "Kontrolle,",
+      "service_codes": []
     }
   ]
 }
 ```
+
+**Note:** `service_codes` is empty because all LEISTUNG records in this database are soft-deleted.
 
 ### CSV output
 
@@ -486,12 +505,8 @@ cat data/output/ivoris_chart_entries_2022-01-18.csv
 
 ```csv
 date,patient_id,insurance_status,insurance_name,chart_entry,service_codes
-2022-01-18,1,GKV,AOK Bayern,Kontrolle, Befund unauffällig,"01, 1040"
-2022-01-18,1,GKV,AOK Bayern,Zahnreinigung durchgeführt,"01, 1040"
-2022-01-18,2,GKV,DAK Gesundheit,Füllungstherapie Zahn 36,13b
-2022-01-18,3,GKV,Techniker Krankenkasse,Röntgenaufnahme OPG,Ä935
-2022-01-18,4,PKV,PRIVAT,Beratung Zahnersatz,
-2022-01-18,5,GKV,Barmer,Professionelle Zahnreinigung,
+2022-01-18,1,GKV,DAK Gesundheit,"Ausführliche Aufklärung über Mundhygiene und Putztechnik, Röntgenauswertung OPG",
+2022-01-18,1,GKV,DAK Gesundheit,"Kontrolle,",
 ```
 
 ---
@@ -510,6 +525,14 @@ For quick demos, here's everything in one file:
 """
 ivoris_extract.py - Complete extraction script in one file.
 
+Uses REAL Ivoris schema:
+- Tables in 'ck' schema
+- PATNR for patient ID, BEMERKUNG for chart entry
+- PATKASSE junction table for insurance
+- ART: 'P'=PKV, '1'-'9'=GKV
+- DELKZ soft delete flag
+- Date as VARCHAR(8) YYYYMMDD
+
 Usage:
     python ivoris_extract.py 2022-01-18
     python ivoris_extract.py 2022-01-18 --csv
@@ -517,7 +540,7 @@ Usage:
 import csv
 import json
 import sys
-from datetime import date, datetime
+from datetime import datetime
 
 import pyodbc
 
@@ -535,34 +558,52 @@ def connect_db():
 
 
 def extract(target_date: str) -> list:
-    """Extract chart entries for a date."""
+    """Extract chart entries for a date (YYYY-MM-DD format)."""
+    # Convert YYYY-MM-DD to YYYYMMDD for the query
+    date_str = target_date.replace("-", "")
+
     query = """
     SELECT
-        k.DATUM, k.PATIENTID,
-        CASE ka.TYP WHEN 'G' THEN 'GKV' WHEN 'P' THEN 'PKV' ELSE 'Selbstzahler' END,
-        ISNULL(ka.NAME, ''),
-        k.EINTRAG,
-        ISNULL((SELECT STRING_AGG(l.LEISTUNG, ',') FROM LEISTUNG l
-                WHERE l.PATIENTID = k.PATIENTID AND l.DATUM = k.DATUM), '')
-    FROM KARTEI k
-    JOIN PATIENT p ON k.PATIENTID = p.PATIENTID
-    LEFT JOIN KASSE ka ON p.KASSEID = ka.KASSEID
-    WHERE k.DATUM = ?
+        SUBSTRING(k.DATUM, 1, 4) + '-' +
+        SUBSTRING(k.DATUM, 5, 2) + '-' +
+        SUBSTRING(k.DATUM, 7, 2) AS date,
+        k.PATNR AS patient_id,
+        CASE
+            WHEN ka.ART = 'P' THEN 'PKV'
+            WHEN ka.ART IN ('1','2','3','4','5','6','7','8','9') THEN 'GKV'
+            ELSE 'Selbstzahler'
+        END AS insurance_status,
+        ISNULL(ka.NAME, '') AS insurance_name,
+        LEFT(ISNULL(k.BEMERKUNG, ''), 500) AS chart_entry,
+        ISNULL((
+            SELECT STRING_AGG(l.LEISTUNG, ', ')
+            FROM ck.LEISTUNG l
+            WHERE l.PATIENTID = k.PATNR
+              AND l.DATUM = k.DATUM
+              AND (l.DELKZ = 0 OR l.DELKZ IS NULL)
+        ), '') AS service_codes
+    FROM ck.KARTEI k
+    JOIN ck.PATKASSE pk ON k.PATNR = pk.PATNR
+        AND (pk.DELKZ = 0 OR pk.DELKZ IS NULL)
+    LEFT JOIN ck.KASSEN ka ON pk.KASSENID = ka.ID
+    WHERE (k.DELKZ = 0 OR k.DELKZ IS NULL)
+      AND k.DATUM = ?
+    ORDER BY k.PATNR
     """
 
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute(query, target_date)
+    cursor.execute(query, date_str)
 
     entries = []
     for row in cursor.fetchall():
         entries.append({
-            "date": row[0].isoformat(),
+            "date": row[0],
             "patient_id": row[1],
             "insurance_status": row[2],
             "insurance_name": row[3],
             "chart_entry": row[4],
-            "service_codes": row[5].split(",") if row[5] else []
+            "service_codes": [s.strip() for s in row[5].split(", ")] if row[5] else []
         })
 
     conn.close()
@@ -616,6 +657,21 @@ if __name__ == "__main__":
 python ivoris_extract.py 2022-01-18          # JSON
 python ivoris_extract.py 2022-01-18 --csv    # CSV
 ```
+
+---
+
+## Key Schema Points (Real Ivoris)
+
+| What You Might Expect | Real Ivoris Schema |
+|-----------------------|-------------------|
+| `dbo` schema | `ck` schema |
+| `PATIENTID` | `PATNR` (in KARTEI, PATKASSE) |
+| `EINTRAG` | `BEMERKUNG` |
+| `KASSE` table | `KASSEN` table |
+| `KASSE.TYP` = 'G'/'P' | `KASSEN.ART` = '1'-'9' (GKV) / 'P' (PKV) |
+| Direct PATIENT→KASSE FK | PATKASSE junction table |
+| DATE type | VARCHAR(8) as YYYYMMDD |
+| No soft delete | `DELKZ` flag on ALL tables |
 
 ---
 
