@@ -285,6 +285,56 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 
 ---
 
+### Request 16: Possible Improvements Document
+**User Input:**
+> "Write a new file about about possible improvements."
+
+**Outcome:** Created `IMPROVEMENTS.md` documenting potential enhancements organized by:
+
+1. **Open Technical Decisions (P0):**
+   - Background job framework (Celery vs RQ vs Dramatiq)
+   - LLM integration (Direct vs LangChain vs LiteLLM)
+   - Database architecture (same DB vs separate schema vs separate DB)
+   - Caching strategy (LLM responses, profiles, value bank)
+   - Notification system (in-app, email, Slack, webhook)
+
+2. **Algorithm Improvements (P1-P2):**
+   - Confidence calibration (historical accuracy adjustment)
+   - Active learning (prioritize uncertain cases)
+   - Ensemble classification (combine multiple signals)
+   - Incremental profiling (only profile changes)
+
+3. **UX Improvements (P1-P2):**
+   - Review workflow (bulk actions, keyboard shortcuts, grouping)
+   - Dashboard & analytics
+   - Comparison view (cross-database)
+
+4. **Architecture Improvements (P2):**
+   - Event-driven pipeline
+   - Plugin architecture for validators
+   - Multi-tenant isolation
+
+5. **Performance Improvements (P1):**
+   - Parallel profiling
+   - Batch LLM requests
+   - Smart sampling
+
+6. **Security Improvements (P1-P2):**
+   - PII masking
+   - Enhanced audit trail
+
+7. **Integration Improvements (P1-P2):**
+   - API versioning
+   - Webhook integration
+   - Export formats
+
+8. **Future Considerations (P3):**
+   - Self-hosted LLM
+   - Cross-language support
+   - Schema evolution tracking
+
+---
+
 ## Design Decisions Summary
 
 | Decision | Rationale |
