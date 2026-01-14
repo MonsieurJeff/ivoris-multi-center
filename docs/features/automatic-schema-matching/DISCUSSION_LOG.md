@@ -130,9 +130,115 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 
 ---
 
+### Request 11: Backend Architecture Decision
+**User Input:**
+> "Now i have an architectural question: when we develop such a complex and elaborate feature, on the backend, should it have its own directory AND/OR blueprint? What are your insight on this?"
+
+**Discussion:**
+- User asked about best practices for organizing complex features in Flask backend
+- Analyzed trade-offs between: Blueprint only, Directory only, Both
+
+**Outcome:** Decision to use **both** Blueprint and Feature Directory:
+- **Blueprint:** For route organization and URL namespacing (`/api/schema-matching/*`)
+- **Directory:** For code organization (services, pipeline, trust, review modules)
+- **Models:** Stay in shared `models/` directory (for DB migrations, cross-feature access)
+
+**Document Created:** `ARCHITECTURE.md` - Full backend structure specification
+
+---
+
+### Request 12: Document Architecture Decision
+**User Input:**
+> "please write a document in docs/features/automatic-schema-matching/ about it so that we remember this when it will be time to build."
+
+**Outcome:** Created `ARCHITECTURE.md` containing:
+- Directory structure specification
+- Component responsibilities
+- API endpoint definitions
+- Blueprint registration code
+- Service patterns
+- Pipeline orchestrator pattern
+- Testing strategy
+- Implementation order
+- Open questions for implementation
+
+---
+
+## Design Decisions Summary
+
+| Decision | Rationale |
+|----------|-----------|
+| Column Quality at Phase 1b | Filter bad columns before LLM calls |
+| HITL = Trust Configuration | Cross-cutting concern, not separate workflow |
+| Multi-dimensional trust | Profile × Risk × Adaptation |
+| Adaptive trust | Trust is earned, not just configured |
+| Final approval always logged | Audit trail regardless of trust level |
+| **Both Blueprint + Directory** | Complex feature needs both route and code organization |
+| **Models in shared location** | DB migrations, cross-feature access |
+
+---
+
+### Request 13: Database Simulator Design
+**User Input:**
+> "in docs/features/automatic-schema-matching/ we need to create a document 'database_simulator'. This needs to be based on quality management detection limits AND/OR realistic situations. please criticize my ideas and improve them"
+
+**Discussion:**
+- Critiqued initial concept: missing ground truth, unclear purpose, conflating test types
+- Proposed three-layer strategy: Unit fixtures, Integration DB, Multi-center simulation
+- Key addition: Ground Truth Manifest (YAML files defining expected results)
+
+**User Decisions:**
+1. Primary use case: Demo database for both testing AND presentations
+2. Output format: Docker SQL Server (realistic)
+3. Schema structure: Both realistic Ivoris + simplified
+4. Multi-center: Yes, 10 databases
+
+**Outcome:** Created `DATABASE_SIMULATOR.md` with:
+
+**10 Centers Design:**
+| Centers | Purpose | Quality |
+|---------|---------|---------|
+| 1-2 | Baseline/Seed | Clean |
+| 3-4 | Naming variations | Moderate |
+| 5-6 | Data quality issues | Poor |
+| 7-8 | Threshold edge cases | Synthetic |
+| 9-10 | Realistic messy | Messy |
+
+**Key Features:**
+- Ground truth manifest format (YAML)
+- Docker Compose for 10 SQL Server instances (ports 1433-1442)
+- Exact threshold tests (94% vs 95% vs 96% NULL)
+- German/Swiss/Austrian insurance variations
+- Column naming variations across centers
+- Data generation scripts structure
+- Demo flow script
+
+---
+
+## Design Decisions Summary
+
+| Decision | Rationale |
+|----------|-----------|
+| Column Quality at Phase 1b | Filter bad columns before LLM calls |
+| HITL = Trust Configuration | Cross-cutting concern, not separate workflow |
+| Multi-dimensional trust | Profile × Risk × Adaptation |
+| Adaptive trust | Trust is earned, not just configured |
+| Final approval always logged | Audit trail regardless of trust level |
+| Both Blueprint + Directory | Complex feature needs both route and code organization |
+| Models in shared location | DB migrations, cross-feature access |
+| **10 Docker SQL Server centers** | Realistic simulation with progression |
+| **Ground truth manifests** | Enable automated validation |
+| **Threshold edge cases in Center 8** | Regression testing for detection limits |
+
+---
+
 ## Open Questions
 
-*None currently - add future questions here*
+1. **Background job framework:** Celery? RQ? Built-in threading?
+2. **LLM integration:** Direct API? Langchain? Custom gateway?
+3. **Database:** Same DB as app? Separate schema? Separate DB?
+4. **Caching:** Redis for classification cache? In-memory?
+5. **Notifications:** Email service? Slack webhook? Both?
 
 ---
 
