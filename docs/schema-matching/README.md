@@ -63,6 +63,7 @@ Given requirements in business language, find the actual database columns:
 | Document | Purpose |
 |----------|---------|
 | [INTERVIEW_QUESTIONS.md](interview/INTERVIEW_QUESTIONS.md) | Questions to ask, positioning strategies |
+| [TEAM_STRUCTURE.md](interview/TEAM_STRUCTURE.md) | Team roles, task assignment, leadership approach |
 | [COMPETITIVE_ANALYSIS.md](interview/COMPETITIVE_ANALYSIS.md) | How we compare to Informatica, AWS Glue, Tamr |
 | [COST_BENEFIT.md](interview/COST_BENEFIT.md) | ROI analysis, break-even, 3-year projections |
 | [DEMO_SCRIPT.md](interview/DEMO_SCRIPT.md) | 15-20 minute walkthrough for stakeholders |
@@ -169,6 +170,7 @@ automatic-schema-matching/
 │
 ├── interview/                   # Interview preparation materials
 │   ├── INTERVIEW_QUESTIONS.md       # Questions to ask, positioning
+│   ├── TEAM_STRUCTURE.md            # Team roles and task assignment
 │   ├── COMPETITIVE_ANALYSIS.md      # Market comparison
 │   ├── COST_BENEFIT.md              # ROI and business case
 │   ├── DEMO_SCRIPT.md               # Stakeholder presentation
