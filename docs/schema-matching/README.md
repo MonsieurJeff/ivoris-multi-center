@@ -60,12 +60,13 @@ Given requirements in business language, find the actual database columns:
 
 ### Interview Preparation (`interview/`)
 
-9 documents with category prefixes for auto-grouping. See [interview/README.md](interview/README.md) for full index.
+10 documents with category prefixes for auto-grouping. See [interview/README.md](interview/README.md) for full index.
 
 | Category | Documents |
 |----------|-----------|
 | **business-** | COST_BENEFIT, DEMO_SCRIPT |
 | **leadership-** | TEAM_STRUCTURE, AGENTIC_TEAM_MANAGEMENT, PRACTICAL_GOVERNANCE |
+| **negotiation-** | COMPENSATION |
 | **positioning-** | INTERVIEW_QUESTIONS, COMPETITIVE_ANALYSIS |
 | **technical-** | CODING_EXERCISES, GLOSSARY |
 
@@ -167,13 +168,14 @@ automatic-schema-matching/
 │   ├── ACCEPTANCE_CRITERIA.md       # Test scenarios
 │   └── DATABASE_SIMULATOR.md        # Test database design
 │
-├── interview/                   # Interview preparation (9 docs, prefixed)
+├── interview/                   # Interview preparation (10 docs, prefixed)
 │   ├── README.md                    # Category index
 │   ├── business-COST_BENEFIT.md
 │   ├── business-DEMO_SCRIPT.md
 │   ├── leadership-AGENTIC_TEAM_MANAGEMENT.md
 │   ├── leadership-PRACTICAL_GOVERNANCE.md
 │   ├── leadership-TEAM_STRUCTURE.md
+│   ├── negotiation-COMPENSATION.md
 │   ├── positioning-COMPETITIVE_ANALYSIS.md
 │   ├── positioning-INTERVIEW_QUESTIONS.md
 │   ├── technical-CODING_EXERCISES.md
