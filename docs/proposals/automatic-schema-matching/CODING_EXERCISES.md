@@ -5,6 +5,32 @@
 
 ---
 
+## Philosophy: Senior-Level Approach
+
+> "We used to search StackOverflow. Now we use LLMs. The skill isn't memorizing algorithms—it's knowing **when** to use them, **evaluating** suggestions critically, and **integrating** them correctly."
+
+### What Senior Interviews Actually Test
+
+| Junior Approach | Senior Approach |
+|-----------------|-----------------|
+| "Implement Levenshtein from scratch" | "Which similarity algorithm fits this use case?" |
+| Memorize syntax | Evaluate trade-offs |
+| Write code in isolation | Integrate with existing systems |
+| Pass test cases | Defend architectural decisions |
+
+### How to Use This Document
+
+1. **Understand the algorithms** - Know what they do, not how to code them from memory
+2. **Know the trade-offs** - When to use Levenshtein vs Jaro-Winkler vs Jaccard
+3. **Evaluate LLM output** - The solutions below are what an LLM might generate; know how to verify them
+4. **Focus on integration** - How would you plug this into a production system?
+
+### Interview Talking Point
+
+> "I'd ask an LLM for the implementation, then verify it handles edge cases, check the complexity matches our scale requirements, and ensure it integrates with our existing patterns. The value I bring is knowing *which* algorithm to request and *how* to validate the result."
+
+---
+
 ## Table of Contents
 
 1. [String Similarity Algorithms](#1-string-similarity-algorithms)
@@ -18,28 +44,39 @@
 
 ## 1. String Similarity Algorithms
 
-### Exercise 1.1: Levenshtein Distance (Edit Distance)
+### When to Use What (Decision Framework)
 
-**Problem:** Implement a function that calculates the minimum number of single-character edits (insert, delete, replace) to transform one string into another.
+| Algorithm | Best For | Weakness | Use When |
+|-----------|----------|----------|----------|
+| **Levenshtein** | Typos, small edits | Slow on long strings | Short identifiers (PATNR → PAT_NR) |
+| **Jaro-Winkler** | Prefix matching | Less intuitive scoring | Abbreviations (PAT → PATIENT) |
+| **Jaccard** | Token overlap | Ignores order | Compound names (BIRTH_DATE → DATE_OF_BIRTH) |
+| **Soundex/Metaphone** | Phonetic similarity | English-centric | Names that sound alike |
+| **TF-IDF + Cosine** | Document similarity | Overkill for short strings | Long descriptions |
 
-**Why they ask:** Core algorithm for fuzzy matching. Shows dynamic programming skills.
+### Senior Interview Question
+
+> "We need to match German column names like PATNR to PATIENTENNUMMER. Which algorithm would you choose and why?"
+
+**Your answer:** "I'd use a **weighted combination**:
+- Jaro-Winkler (40%) - catches the PAT prefix match
+- Jaccard on tokens (30%) - catches shared tokens after splitting
+- Levenshtein (30%) - catches overall similarity
+
+I'd ask an LLM to generate the implementations, then validate against test cases from our actual data."
+
+---
+
+### Exercise 1.1: Algorithm Selection (Not Implementation)
+
+**Scenario:** You're building a column name matcher. An LLM gives you these three functions. Your job: **evaluate which to use when**.
 
 ```python
-# TODO: Implement this
-def levenshtein_distance(s1: str, s2: str) -> int:
-    """
-    Calculate edit distance between two strings.
-
-    Examples:
-        levenshtein_distance("PATNR", "PATIENTNR") -> 4
-        levenshtein_distance("PATNR", "PATNR") -> 0
-        levenshtein_distance("kitten", "sitting") -> 3
-    """
-    pass
+# LLM-generated code - your job is to EVALUATE, not write from scratch
 ```
 
 <details>
-<summary>Solution (click to expand)</summary>
+<summary>LLM-Generated: Levenshtein (click to review)</summary>
 
 ```python
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -47,13 +84,10 @@ def levenshtein_distance(s1: str, s2: str) -> int:
     Calculate edit distance between two strings.
     Time: O(m*n), Space: O(min(m,n))
     """
-    # Ensure s1 is the shorter string for space optimization
     if len(s1) > len(s2):
         s1, s2 = s2, s1
 
     m, n = len(s1), len(s2)
-
-    # Only need two rows at a time
     prev = list(range(m + 1))
     curr = [0] * (m + 1)
 
@@ -61,13 +95,9 @@ def levenshtein_distance(s1: str, s2: str) -> int:
         curr[0] = j
         for i in range(1, m + 1):
             if s1[i-1] == s2[j-1]:
-                curr[i] = prev[i-1]  # No edit needed
+                curr[i] = prev[i-1]
             else:
-                curr[i] = 1 + min(
-                    prev[i],      # Delete
-                    curr[i-1],    # Insert
-                    prev[i-1]     # Replace
-                )
+                curr[i] = 1 + min(prev[i], curr[i-1], prev[i-1])
         prev, curr = curr, prev
 
     return prev[m]
@@ -81,36 +111,17 @@ def levenshtein_similarity(s1: str, s2: str) -> float:
     return 1 - (distance / max_len)
 ```
 
-**Key points to mention in interview:**
-- Time complexity: O(m*n)
-- Space optimization: O(min(m,n)) using two rows
-- Similarity = 1 - (distance / max_length)
+**Evaluation checklist:**
+- ✅ Space-optimized (two rows instead of full matrix)
+- ✅ Handles empty strings
+- ✅ Returns normalized 0-1 score
+- ⚠️ O(m×n) - may be slow for very long strings (but column names are short)
+- ✅ Suitable for our use case
 
 </details>
 
----
-
-### Exercise 1.2: Jaro-Winkler Similarity
-
-**Problem:** Implement Jaro-Winkler similarity, which gives higher scores to strings that match from the beginning.
-
-**Why they ask:** Better for names/identifiers where prefixes matter (PATIENT vs PAT).
-
-```python
-# TODO: Implement this
-def jaro_winkler(s1: str, s2: str, prefix_weight: float = 0.1) -> float:
-    """
-    Calculate Jaro-Winkler similarity (0-1).
-
-    Examples:
-        jaro_winkler("PATNR", "PATIENTNR") -> ~0.82
-        jaro_winkler("DIXON", "DICKSONX") -> ~0.81
-    """
-    pass
-```
-
 <details>
-<summary>Solution (click to expand)</summary>
+<summary>LLM-Generated: Jaro-Winkler (click to review)</summary>
 
 ```python
 def jaro_similarity(s1: str, s2: str) -> float:
@@ -121,22 +132,17 @@ def jaro_similarity(s1: str, s2: str) -> float:
         return 0.0
 
     len1, len2 = len(s1), len(s2)
-
-    # Match window
     match_distance = max(len1, len2) // 2 - 1
     match_distance = max(0, match_distance)
 
     s1_matches = [False] * len1
     s2_matches = [False] * len2
-
     matches = 0
     transpositions = 0
 
-    # Find matches
     for i in range(len1):
         start = max(0, i - match_distance)
         end = min(i + match_distance + 1, len2)
-
         for j in range(start, end):
             if s2_matches[j] or s1[i] != s2[j]:
                 continue
@@ -148,7 +154,6 @@ def jaro_similarity(s1: str, s2: str) -> float:
     if matches == 0:
         return 0.0
 
-    # Count transpositions
     k = 0
     for i in range(len1):
         if not s1_matches[i]:
@@ -159,88 +164,46 @@ def jaro_similarity(s1: str, s2: str) -> float:
             transpositions += 1
         k += 1
 
-    jaro = (
-        matches / len1 +
-        matches / len2 +
-        (matches - transpositions / 2) / matches
-    ) / 3
-
-    return jaro
+    return (matches/len1 + matches/len2 + (matches - transpositions/2)/matches) / 3
 
 def jaro_winkler(s1: str, s2: str, prefix_weight: float = 0.1) -> float:
-    """
-    Calculate Jaro-Winkler similarity.
-    Boosts score for common prefixes (up to 4 chars).
-    """
+    """Jaro-Winkler: boosts score for common prefixes."""
     jaro = jaro_similarity(s1, s2)
-
-    # Find common prefix (max 4 characters)
     prefix_len = 0
     for i in range(min(len(s1), len(s2), 4)):
         if s1[i] == s2[i]:
             prefix_len += 1
         else:
             break
-
     return jaro + prefix_len * prefix_weight * (1 - jaro)
 ```
 
-**Key points to mention:**
-- Jaro: Based on matching characters and transpositions
-- Winkler: Adds prefix bonus (up to 4 chars, weight typically 0.1)
-- Better for names where prefix matters
+**Evaluation checklist:**
+- ✅ Handles edge cases (empty, identical)
+- ✅ Prefix boost capped at 4 characters (standard)
+- ✅ Returns 0-1 score
+- ⚠️ More complex than Levenshtein - verify with test cases
+- ✅ Good for abbreviations (PAT → PATIENT)
 
 </details>
 
----
-
-### Exercise 1.3: Token-Based Similarity (Jaccard)
-
-**Problem:** Implement Jaccard similarity for tokenized strings.
-
-**Why they ask:** Better for compound column names like `PATIENT_BIRTH_DATE`.
-
-```python
-# TODO: Implement this
-def jaccard_similarity(s1: str, s2: str) -> float:
-    """
-    Calculate Jaccard similarity based on tokens.
-
-    Examples:
-        jaccard_similarity("PATIENT_NR", "PATIENT_NUMBER") -> 0.5
-        jaccard_similarity("BIRTH_DATE", "DATE_OF_BIRTH") -> 0.5
-    """
-    pass
-```
-
 <details>
-<summary>Solution (click to expand)</summary>
+<summary>LLM-Generated: Jaccard on Tokens (click to review)</summary>
 
 ```python
 import re
 
 def tokenize(s: str) -> set:
-    """
-    Split string into tokens.
-    Handles: snake_case, camelCase, PascalCase, numbers
-    """
-    # Split on underscores and spaces
+    """Split column name into tokens."""
     tokens = re.split(r'[_\s]+', s)
-
-    # Split camelCase
     expanded = []
     for token in tokens:
-        # Split on case transitions: 'patientNumber' -> ['patient', 'Number']
         parts = re.split(r'(?<=[a-z])(?=[A-Z])', token)
         expanded.extend(parts)
-
-    # Normalize: lowercase, filter empty
     return {t.lower() for t in expanded if t}
 
 def jaccard_similarity(s1: str, s2: str) -> float:
-    """
-    Calculate Jaccard similarity: |A ∩ B| / |A ∪ B|
-    """
+    """Jaccard: |intersection| / |union| of token sets."""
     tokens1 = tokenize(s1)
     tokens2 = tokenize(s2)
 
@@ -251,147 +214,149 @@ def jaccard_similarity(s1: str, s2: str) -> float:
 
     intersection = tokens1 & tokens2
     union = tokens1 | tokens2
-
     return len(intersection) / len(union)
-
-# Bonus: Weighted Jaccard for important tokens
-def weighted_jaccard(s1: str, s2: str, important_tokens: set = None) -> float:
-    """
-    Jaccard with higher weight for important domain tokens.
-    """
-    if important_tokens is None:
-        important_tokens = {'patient', 'id', 'date', 'name', 'number', 'insurance'}
-
-    tokens1 = tokenize(s1)
-    tokens2 = tokenize(s2)
-
-    if not tokens1 and not tokens2:
-        return 1.0
-
-    intersection = tokens1 & tokens2
-    union = tokens1 | tokens2
-
-    # Weight important tokens higher
-    def weight(token):
-        return 2.0 if token in important_tokens else 1.0
-
-    weighted_intersection = sum(weight(t) for t in intersection)
-    weighted_union = sum(weight(t) for t in union)
-
-    return weighted_intersection / weighted_union if weighted_union > 0 else 0.0
 ```
 
-**Key points to mention:**
-- Tokenization handles multiple naming conventions
-- Jaccard is set-based: order doesn't matter
-- Can weight domain-specific tokens
+**Evaluation checklist:**
+- ✅ Handles snake_case, camelCase, PascalCase
+- ✅ Case-insensitive
+- ✅ Returns 0-1 score
+- ⚠️ Ignores token order (DATE_OF_BIRTH = BIRTH_DATE_OF)
+- ✅ Good for reordered compound names
 
 </details>
 
 ---
 
-### Exercise 1.4: Combined Similarity Score
+### Exercise 1.2: Integration Decision
 
-**Problem:** Combine multiple similarity algorithms into a single score.
-
-**Why they ask:** Real systems use multiple signals. Shows you understand trade-offs.
-
-```python
-# TODO: Implement this
-def combined_similarity(s1: str, s2: str) -> dict:
-    """
-    Calculate multiple similarity scores and combine them.
-
-    Returns:
-        {
-            'levenshtein': 0.82,
-            'jaro_winkler': 0.85,
-            'jaccard': 0.67,
-            'combined': 0.80,
-            'best_match': True  # if combined >= 0.75
-        }
-    """
-    pass
-```
+**Question:** How would you combine these in production?
 
 <details>
-<summary>Solution (click to expand)</summary>
+<summary>Senior Answer</summary>
 
 ```python
-def combined_similarity(
-    s1: str,
-    s2: str,
-    weights: dict = None
-) -> dict:
+def combined_similarity(s1: str, s2: str) -> dict:
     """
-    Calculate multiple similarity scores and combine them.
+    Production integration: weighted combination of algorithms.
 
-    Default weights optimized for column name matching:
-    - Jaro-Winkler: 0.4 (prefix-sensitive, good for abbreviations)
-    - Levenshtein: 0.3 (overall edit distance)
-    - Jaccard: 0.3 (token overlap, good for compound names)
+    Weights tuned for German column names based on our data analysis.
     """
-    if weights is None:
-        weights = {
-            'levenshtein': 0.3,
-            'jaro_winkler': 0.4,
-            'jaccard': 0.3
-        }
-
-    # Normalize strings for comparison
+    # Normalize once
     s1_norm = s1.upper().strip()
     s2_norm = s2.upper().strip()
 
-    # Calculate individual scores
+    # Get individual scores
     lev = levenshtein_similarity(s1_norm, s2_norm)
     jw = jaro_winkler(s1_norm, s2_norm)
     jac = jaccard_similarity(s1_norm, s2_norm)
 
-    # Weighted combination
-    combined = (
-        lev * weights['levenshtein'] +
-        jw * weights['jaro_winkler'] +
-        jac * weights['jaccard']
-    )
+    # Weighted combination (tuned for our domain)
+    combined = (lev * 0.30) + (jw * 0.40) + (jac * 0.30)
 
     return {
-        'levenshtein': round(lev, 3),
-        'jaro_winkler': round(jw, 3),
-        'jaccard': round(jac, 3),
         'combined': round(combined, 3),
-        'best_match': combined >= 0.75
+        'components': {'levenshtein': lev, 'jaro_winkler': jw, 'jaccard': jac},
+        'recommendation': 'match' if combined >= 0.75 else 'review' if combined >= 0.60 else 'no_match'
     }
-
-# Test cases
-test_cases = [
-    ("PATNR", "PATIENT_NR"),
-    ("PATNR", "PATIENTENNUMMER"),
-    ("GEBDAT", "GEBURTSDATUM"),
-    ("BIRTH_DATE", "DATE_OF_BIRTH"),
-    ("KASSE", "INSURANCE"),  # Different language - should be low
-]
-
-for s1, s2 in test_cases:
-    result = combined_similarity(s1, s2)
-    print(f"{s1:20} vs {s2:20} -> {result['combined']:.2f} ({'✓' if result['best_match'] else '✗'})")
 ```
 
-**Key points to mention:**
-- Different algorithms excel at different patterns
-- Weights can be tuned based on your data
-- Threshold (0.75) is configurable via trust profiles
+**Why this approach:**
+1. **Jaro-Winkler weighted highest** - Our data has many abbreviations (PAT, GEB, VERS)
+2. **Threshold at 0.75** - Based on false positive analysis of our 15 databases
+3. **Return components** - For explainability in review queue
+
+**What I'd tell the interviewer:**
+> "I wouldn't implement these from scratch. I'd use `jellyfish` or `rapidfuzz` libraries in production—they're optimized in C. But I need to understand the algorithms to choose the right weights and thresholds."
 
 </details>
+
+---
+
+### Key Points to Remember
+
+| Point | What to Say |
+|-------|-------------|
+| **Don't memorize** | "I'd generate this with an LLM and verify it" |
+| **Know trade-offs** | "Levenshtein is O(n²), Jaro-Winkler handles prefixes better" |
+| **Use libraries** | "In production I'd use `rapidfuzz` for performance" |
+| **Tune weights** | "Weights come from analyzing our actual data" |
+| **Explain choices** | "Jaro-Winkler is weighted higher because of German abbreviations" |
+
+---
+
+### Production Libraries (What You'd Actually Use)
+
+In production, don't implement these yourself. Use battle-tested libraries:
+
+```python
+# Python - Production Choice
+from rapidfuzz import fuzz, distance
+
+# Fast, C-optimized implementations
+fuzz.ratio("PATNR", "PATIENT_NR")           # Levenshtein-based
+fuzz.partial_ratio("PAT", "PATIENT")        # Partial matching
+fuzz.token_sort_ratio("A B C", "C B A")     # Token-based
+
+# Alternative: jellyfish (pure Python, simpler API)
+import jellyfish
+jellyfish.levenshtein_distance("PATNR", "PATIENT_NR")
+jellyfish.jaro_winkler_similarity("PATNR", "PATIENT_NR")
+```
+
+**Interview talking point:**
+> "I'd use `rapidfuzz` in production—it's C-optimized and handles edge cases. I know the algorithms well enough to choose the right one and tune the thresholds, but I'm not going to hand-roll Levenshtein when a library does it 100x faster."
 
 ---
 
 ## 2. Data Structure Design
 
-### Exercise 2.1: Value Bank Implementation
+### Senior Approach: Design Discussions, Not Implementations
 
-**Problem:** Design a data structure for efficient column name lookup with fuzzy matching.
+Data structure questions at the senior level are about **trade-off discussions**, not whiteboard coding:
 
-**Why they ask:** Tests data structure choice, trade-offs between memory and speed.
+| They Ask | You Discuss |
+|----------|-------------|
+| "Design a data structure for X" | Storage vs speed trade-offs, what scales |
+| "How would you implement this?" | Existing solutions, when to build vs buy |
+| "What's the complexity?" | Why it matters for our scale, where bottlenecks are |
+
+---
+
+### Exercise 2.1: Value Bank Design Discussion
+
+**Scenario:** You need to store 10,000 learned column name variants and look them up efficiently.
+
+**Senior Question:** "Walk me through your design decisions."
+
+<details>
+<summary>How to Answer</summary>
+
+**Step 1: Clarify Requirements**
+> "Before I design, let me understand: How many lookups per second? How often do we add new variants? Is memory constrained?"
+
+**Step 2: Discuss Trade-offs**
+
+| Approach | Pros | Cons | When to Use |
+|----------|------|------|-------------|
+| **HashMap** | O(1) exact lookup | No fuzzy matching | Exact matches only |
+| **Trie** | Prefix search | Memory overhead | Autocomplete use case |
+| **Inverted Index** | Fast candidate filtering | Extra storage | When fuzzy is common |
+| **Vector DB** | Semantic similarity | Overkill, latency | Huge datasets |
+
+**Step 3: Propose Solution**
+> "For 10K variants, I'd use a HashMap for exact matches plus an inverted token index for fuzzy candidate filtering. The token index reduces fuzzy search from O(n) to O(candidates)."
+
+**Step 4: Acknowledge Alternatives**
+> "If we're at 1M variants, I'd consider a vector database. But for our scale, in-memory structures are fine."
+
+</details>
+
+---
+
+### Reference Implementation (LLM-Generated)
+
+**Context:** This is what you'd get from an LLM. Know how to **evaluate** it, not memorize it.
 
 ```python
 # TODO: Implement this
@@ -1628,61 +1593,82 @@ Print this and review before the interview:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    INTERVIEW QUICK REFERENCE                     │
+│               SENIOR INTERVIEW QUICK REFERENCE                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  SIMILARITY ALGORITHMS                                          │
-│  ├─ Levenshtein: Edit distance, O(m×n), good for typos         │
-│  ├─ Jaro-Winkler: Prefix-weighted, good for abbreviations      │
-│  └─ Jaccard: Token overlap, good for compound names            │
+│  MINDSET                                                        │
+│  ├─ "I'd use an LLM to generate, then verify and integrate"    │
+│  ├─ "Let me discuss the trade-offs first"                      │
+│  └─ "In production, I'd use [library] because..."              │
+│                                                                  │
+│  ALGORITHM SELECTION (Know When, Not How)                       │
+│  ├─ Levenshtein: Typos, short strings → use `rapidfuzz`        │
+│  ├─ Jaro-Winkler: Abbreviations, prefixes matter               │
+│  ├─ Jaccard: Compound names, order doesn't matter              │
+│  └─ Combined: Weight based on YOUR data analysis               │
 │                                                                  │
 │  SCALABILITY PATTERNS                                           │
-│  ├─ Async processing: Don't block API, use job queue           │
-│  ├─ Parallel workers: Process tables/columns concurrently      │
-│  ├─ Value bank caching: Load once, reuse                       │
-│  └─ Connection pooling: Reuse DB connections                   │
+│  ├─ Async: Job queue (Redis/Celery), don't block API           │
+│  ├─ Parallel: Workers process tables/columns concurrently      │
+│  ├─ Caching: Load value bank once, reuse across requests       │
+│  └─ Pooling: Connection pools, not new connections per query   │
 │                                                                  │
-│  DATA STRUCTURES                                                │
-│  ├─ HashMap: O(1) exact lookup                                 │
-│  ├─ Inverted index: Fast fuzzy candidate filtering             │
-│  └─ Priority queue: Review queue ordering                      │
+│  DESIGN DISCUSSION FRAMEWORK                                    │
+│  ├─ 1. Clarify requirements (scale, constraints)               │
+│  ├─ 2. Discuss trade-offs (not just one solution)              │
+│  ├─ 3. Propose with rationale                                  │
+│  └─ 4. Acknowledge alternatives and when they'd be better      │
 │                                                                  │
-│  SQL ESSENTIALS                                                 │
-│  ├─ INFORMATION_SCHEMA.COLUMNS: Column metadata                │
-│  ├─ COUNT(*) - COUNT(col): Null count                          │
-│  ├─ COUNT(DISTINCT col): Cardinality                           │
-│  └─ TOP N / LIMIT N: Sampling                                  │
+│  TRUST THRESHOLDS (Configurable, Not Hardcoded)                │
+│  ├─ Conservative: 99% auto-accept (new client, critical)       │
+│  ├─ Standard: 90% auto-accept, 70% review threshold            │
+│  └─ Permissive: 80% auto-accept (demos, trusted schemas)       │
 │                                                                  │
-│  CONFIDENCE FORMULA                                             │
-│  └─ combined = (lev × 0.3) + (jw × 0.4) + (jaccard × 0.3)     │
-│                                                                  │
-│  TRUST THRESHOLDS (Standard)                                    │
-│  ├─ ≥90%: Auto-accept                                          │
-│  ├─ 70-89%: Human review                                       │
-│  └─ <70%: Reject                                               │
-│                                                                  │
-│  KEY METRICS                                                    │
-│  ├─ Auto-match rate: % auto-accepted                           │
-│  ├─ Review queue size: Pending human decisions                 │
-│  └─ Value bank coverage: % patterns recognized                 │
+│  KEY LIBRARIES (Don't Reinvent)                                │
+│  ├─ rapidfuzz: Fast fuzzy matching (C-optimized)               │
+│  ├─ jellyfish: Simple Python fuzzy matching                    │
+│  ├─ SQLAlchemy: DB connections, pooling, ORM                   │
+│  └─ Celery/Redis: Async job processing                         │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Practice Schedule
+## Preparation Approach
 
-| Day | Focus | Time |
-|-----|-------|------|
-| **Day 1** | Similarity algorithms (1.1-1.4) | 2 hours |
-| **Day 2** | Data structures (2.1-2.2) | 2 hours |
-| **Day 3** | SQL exercises (3.1-3.5) | 1.5 hours |
-| **Day 4** | System design (4.1-4.3) | 2 hours |
-| **Day 5** | Code review (5.1-5.2) | 1 hour |
-| **Day 6** | Whiteboard practice (6.1-6.3) | 1 hour |
-| **Day 7** | Full mock interview | 2 hours |
+### What to Focus On
+
+| Priority | Focus | Why |
+|----------|-------|-----|
+| **High** | Trade-off discussions | Senior interviews test judgment |
+| **High** | System design whiteboarding | Draw architecture, explain decisions |
+| **Medium** | SQL schema discovery | Quick wins, shows practical knowledge |
+| **Medium** | Code review skills | Spot scalability issues |
+| **Low** | Algorithm implementation | Use LLMs, know when to apply |
+
+### Key Questions to Prepare
+
+1. **"How would you scale this to 1000 clients?"**
+   - Async processing, value bank learning, parallel workers
+
+2. **"What happens when the algorithm is wrong?"**
+   - Trust profiles, human review, audit trail
+
+3. **"Why this algorithm over alternatives?"**
+   - Data-driven: "We analyzed our 15 databases and found..."
+
+4. **"Walk me through the architecture."**
+   - Draw it: API → Queue → Workers → DB
+   - Explain each decision
+
+### Day Before Interview
+
+1. Review TECHNICAL_SOLUTION.md - know your architecture
+2. Practice drawing the system diagram (5 min max)
+3. Prepare 2-3 questions to ask THEM about their rewrite challenges
+4. Remember: You're not a junior being tested. You're a senior discussing solutions.
 
 ---
 
-*Good luck with the interview!*
+*You've built real systems. You've worked with real databases. Show that experience.*
