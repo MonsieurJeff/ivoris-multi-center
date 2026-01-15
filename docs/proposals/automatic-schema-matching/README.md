@@ -50,6 +50,7 @@ Given requirements in business language, find the actual database columns:
 | Document | Purpose |
 |----------|---------|
 | [TECHNICAL_SOLUTION.md](TECHNICAL_SOLUTION.md) | Production-ready implementation (DB schema, algorithms, API) |
+| [CODING_EXERCISES.md](CODING_EXERCISES.md) | Interview prep (algorithms, SQL, system design, whiteboard) |
 | [MCP_ARCHITECTURE.md](MCP_ARCHITECTURE.md) | Agent-based architecture with MCP servers |
 | [ACCEPTANCE_CRITERIA.md](ACCEPTANCE_CRITERIA.md) | Gherkin acceptance criteria |
 | [DATABASE_SIMULATOR.md](DATABASE_SIMULATOR.md) | Test databases (10 simulated centers) |
@@ -139,6 +140,7 @@ The original pipeline design is archived at [archive/pipeline-design/](archive/p
 automatic-schema-matching/
 ├── README.md                    # This file
 ├── TECHNICAL_SOLUTION.md        # Production implementation details
+├── CODING_EXERCISES.md          # Interview preparation exercises
 ├── MCP_ARCHITECTURE.md          # Agent-based architecture
 ├── ACCEPTANCE_CRITERIA.md       # Test scenarios
 ├── DATABASE_SIMULATOR.md        # Test database design
