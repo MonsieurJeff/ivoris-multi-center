@@ -423,6 +423,96 @@ See `archive/pipeline-design/` for original design documentation.
 
 ---
 
+## Session 3: Interview Preparation & Technical Solution (2025-01-15)
+
+### Request 20: Production Roadmap
+**User Input:**
+> "with the MCP, what is the roadmap until it gets into production readiness? Timeline?"
+
+**Outcome:** Provided 4-phase roadmap:
+1. Foundation (3 MCP servers)
+2. Agent Integration
+3. Validation (zone testing)
+4. Production Polish (caching, UX)
+
+Note: No timeline estimates provided per best practices.
+
+---
+
+### Request 21: Database Count Analysis
+**User Input:**
+> "How many databases do we need to be effective? Can we start we 15?"
+
+**Discussion:**
+- Clarified: 15 simulated vs 15 real databases
+- For simulated: Recommended distribution A(2), B(4), C(6), D(3) = 15
+
+**Key Insight:** User revealed they have 15 real databases already.
+
+---
+
+### Request 22: Real Database Context
+**User Input:**
+> "We already have 15 real database. I am just brainstorming here."
+> "the 15 databases are similar but different. And yes, already partially mapped."
+
+**Outcome:** This changes the bootstrap strategy significantly:
+- Partial mappings = ground truth for seeding value bank
+- Real databases = actual chaos patterns, not simulated
+- Can measure baseline accuracy before tuning
+
+---
+
+### Request 23: Interview Preparation
+**User Input:**
+> "I am preparing for a job interview and i know that they had to rewrite the app because it was not scalable. i want to be prepared for solutions. I would like to bring a fresh start"
+> "Yes but i want to be able to speak technically also, this is why i want a real solution to offer."
+
+**Outcome:** Created comprehensive `TECHNICAL_SOLUTION.md` with:
+- Full database schema (6 tables with indexes)
+- Multi-signal matching algorithm (exact, fuzzy, pattern, semantic)
+- API design (Flask endpoints)
+- Trust profile configuration
+- Scalability patterns (Celery workers, horizontal scaling)
+- Interview talking points
+
+---
+
+### Request 24: Documentation Restructure
+**User Input:**
+> "save this to a document. We will renamed /docs/features/ in /docs/proposals/ and put the document there. What do you think? Best practices"
+> "yes, keep it with existing"
+
+**Discussion:**
+- `features/` implies shipped; `proposals/` implies planned
+- Recommended: Rename to `proposals/`, keep empty `features/` for future
+
+**Outcome:**
+- Renamed `docs/features/` → `docs/proposals/`
+- Created `docs/features/.gitkeep` as placeholder
+- Added `TECHNICAL_SOLUTION.md` to automatic-schema-matching folder
+
+---
+
+## Design Decisions Summary
+
+### Current Architecture: Dual Approach
+
+| Approach | Document | Use Case |
+|----------|----------|----------|
+| **MCP Agent** | MCP_ARCHITECTURE.md | Flexible, agent-driven exploration |
+| **Service** | TECHNICAL_SOLUTION.md | Production implementation details |
+
+### Documentation Structure
+
+| Decision | Rationale |
+|----------|-----------|
+| `proposals/` for design work | Accurately reflects status (not built yet) |
+| `features/` reserved for shipped | Clear lifecycle: proposal → feature |
+| Keep both approaches documented | MCP for architecture, Technical for implementation |
+
+---
+
 ## Open Questions
 
 1. ~~**Background job framework:**~~ *Eliminated - Agent handles async*
@@ -433,4 +523,4 @@ See `archive/pipeline-design/` for original design documentation.
 
 ---
 
-*Last updated: 2024-01-15*
+*Last updated: 2025-01-15*
