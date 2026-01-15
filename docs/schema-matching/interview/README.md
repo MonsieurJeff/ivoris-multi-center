@@ -1,6 +1,6 @@
 # Interview Preparation
 
-**10 documents organized by category** | Prefix naming for auto-grouping
+**11 documents organized by category** | Prefix naming for auto-grouping
 
 ---
 
@@ -26,6 +26,12 @@
 | Document | Purpose |
 |----------|---------|
 | [negotiation-COMPENSATION.md](negotiation-COMPENSATION.md) | Salary, equity, contract terms, negotiation scripts |
+
+### Targeting (Company-Specific)
+
+| Document | Purpose |
+|----------|---------|
+| [targeting-CLINERO.md](targeting-CLINERO.md) | Clinero GmbH - AI Founding Engineer prep |
 
 ### Positioning (How I Present)
 
@@ -84,7 +90,8 @@ Categories sort alphabetically:
 2. `leadership-` (3 files)
 3. `negotiation-` (1 file)
 4. `positioning-` (2 files)
-5. `technical-` (2 files)
+5. `targeting-` (1 file) - company-specific prep
+6. `technical-` (2 files)
 
 ---
 
@@ -100,5 +107,6 @@ Categories sort alphabetically:
 | **negotiation-COMPENSATION** | "Know your worth, anchor high, get it in writing" |
 | **positioning-QUESTIONS** | "What broke? How do you handle schema variations today?" |
 | **positioning-COMPETITIVE** | "We beat Informatica on cost, Tamr on domain focus" |
+| **targeting-CLINERO** | "Perfect match: dental billing automation, LLM agents, your exact domain" |
 | **technical-CODING** | "Evaluate algorithms, don't implement from scratch" |
 | **technical-GLOSSARY** | "PATNR = patient_id, GEBDAT = birth_date, KASSE = insurance" |
