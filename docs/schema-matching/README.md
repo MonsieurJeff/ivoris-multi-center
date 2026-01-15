@@ -60,17 +60,14 @@ Given requirements in business language, find the actual database columns:
 
 ### Interview Preparation (`interview/`)
 
-| Document | Purpose |
-|----------|---------|
-| [INTERVIEW_QUESTIONS.md](interview/INTERVIEW_QUESTIONS.md) | Questions to ask, positioning strategies |
-| [TEAM_STRUCTURE.md](interview/TEAM_STRUCTURE.md) | Team roles, task assignment, leadership approach |
-| [AGENTIC_TEAM_MANAGEMENT.md](interview/AGENTIC_TEAM_MANAGEMENT.md) | Quality management with AI-assisted development |
-| [PRACTICAL_GOVERNANCE.md](interview/PRACTICAL_GOVERNANCE.md) | Real experience from OutrePilot/Outrepreneur |
-| [COMPETITIVE_ANALYSIS.md](interview/COMPETITIVE_ANALYSIS.md) | How we compare to Informatica, AWS Glue, Tamr |
-| [COST_BENEFIT.md](interview/COST_BENEFIT.md) | ROI analysis, break-even, 3-year projections |
-| [DEMO_SCRIPT.md](interview/DEMO_SCRIPT.md) | 15-20 minute walkthrough for stakeholders |
-| [CODING_EXERCISES.md](interview/CODING_EXERCISES.md) | Senior-level technical discussion prep |
-| [GLOSSARY.md](interview/GLOSSARY.md) | Terminology quick reference |
+9 documents with category prefixes for auto-grouping. See [interview/README.md](interview/README.md) for full index.
+
+| Category | Documents |
+|----------|-----------|
+| **business-** | COST_BENEFIT, DEMO_SCRIPT |
+| **leadership-** | TEAM_STRUCTURE, AGENTIC_TEAM_MANAGEMENT, PRACTICAL_GOVERNANCE |
+| **positioning-** | INTERVIEW_QUESTIONS, COMPETITIVE_ANALYSIS |
+| **technical-** | CODING_EXERCISES, GLOSSARY |
 
 ### Reference (`reference/`)
 
@@ -170,16 +167,17 @@ automatic-schema-matching/
 │   ├── ACCEPTANCE_CRITERIA.md       # Test scenarios
 │   └── DATABASE_SIMULATOR.md        # Test database design
 │
-├── interview/                   # Interview preparation materials
-│   ├── INTERVIEW_QUESTIONS.md       # Questions to ask, positioning
-│   ├── TEAM_STRUCTURE.md            # Team roles and task assignment
-│   ├── AGENTIC_TEAM_MANAGEMENT.md   # AI-assisted development quality
-│   ├── PRACTICAL_GOVERNANCE.md      # Real OutrePilot/Outrepreneur experience
-│   ├── COMPETITIVE_ANALYSIS.md      # Market comparison
-│   ├── COST_BENEFIT.md              # ROI and business case
-│   ├── DEMO_SCRIPT.md               # Stakeholder presentation
-│   ├── CODING_EXERCISES.md          # Senior-level technical prep
-│   └── GLOSSARY.md                  # Terminology reference
+├── interview/                   # Interview preparation (9 docs, prefixed)
+│   ├── README.md                    # Category index
+│   ├── business-COST_BENEFIT.md
+│   ├── business-DEMO_SCRIPT.md
+│   ├── leadership-AGENTIC_TEAM_MANAGEMENT.md
+│   ├── leadership-PRACTICAL_GOVERNANCE.md
+│   ├── leadership-TEAM_STRUCTURE.md
+│   ├── positioning-COMPETITIVE_ANALYSIS.md
+│   ├── positioning-INTERVIEW_QUESTIONS.md
+│   ├── technical-CODING_EXERCISES.md
+│   └── technical-GLOSSARY.md
 │
 ├── reference/                   # Additional reference materials
 │   ├── IMPROVEMENTS.md              # Future enhancements
