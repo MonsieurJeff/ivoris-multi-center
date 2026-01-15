@@ -335,36 +335,102 @@ Key insight: Trust is multi-dimensional (profile × risk × adaptation), not a s
 
 ---
 
+### Request 17: MCP Architecture Question
+**User Input:**
+> "Can we use some fundamental principles of MCP to improve or replace automatic-schema-matching?"
+
+**Discussion:**
+- Analyzed MCP (Model Context Protocol) principles
+- Compared pipeline approach vs MCP-native agent architecture
+- Proposed three options: A) MCP-Enhanced Pipeline, B) Full Agent, C) Multi-Agent
+
+**Key insight:** The 5-stage pipeline was essentially codifying what an intelligent agent would naturally do. With MCP, we let the agent decide.
+
+---
+
+### Request 18: MCP Pivot Decision
+**User Input:**
+> "The 'automatic-schema-matching' is not developed yet, it is only a proposal of a feature. Knowing this, what do you suggest?"
+
+**Discussion:**
+- Since feature is greenfield, no legacy code constraints
+- Recommended going directly to MCP-native design (Option B)
+- Much simpler: ~10 files instead of ~50
+
+**Outcome:** Decision to pivot from pipeline architecture to MCP-native agent.
+
+---
+
+### Request 19: Restructure Documentation for MCP
+**User Input:**
+> "yes" (to restructure documentation)
+
+**Outcome:** Complete documentation restructure:
+
+1. **Archived** (moved to `archive/pipeline-design/`):
+   - 01-07-*.md methodology docs
+   - ARCHITECTURE.md (pipeline architecture)
+   - ACCEPTANCE.md (pipeline acceptance criteria)
+
+2. **Created**:
+   - `MCP_ARCHITECTURE.md` - New agent-based architecture
+   - `ACCEPTANCE_CRITERIA.md` - Simplified for MCP approach
+
+3. **Updated**:
+   - `README.md` - Rewritten for MCP approach
+   - `IMPROVEMENTS.md` - Simplified, many items eliminated
+   - `DISCUSSION_LOG.md` - This update
+
+4. **Kept unchanged**:
+   - `DATABASE_SIMULATOR.md` - Still valid for testing
+
+---
+
 ## Design Decisions Summary
+
+### Current Architecture: MCP-Native Agent
 
 | Decision | Rationale |
 |----------|-----------|
-| Column Quality at Phase 1b | Filter bad columns before LLM calls |
-| HITL = Trust Configuration | Cross-cutting concern, not separate workflow |
-| Multi-dimensional trust | Profile × Risk × Adaptation |
-| Adaptive trust | Trust is earned, not just configured |
-| Final approval always logged | Audit trail regardless of trust level |
-| Both Blueprint + Directory | Complex feature needs both route and code organization |
-| Models in shared location | DB migrations, cross-feature access |
+| **MCP-native over pipeline** | Agent flexibility, ~10 files vs ~50, natural HitL |
+| **3 MCP servers** | Database, Value Bank, Review - clean separation |
+| **Trust profiles** | Configure agent behavior (conservative/standard/permissive) |
+| **Value bank as MCP resource** | Learned patterns accessible to agent |
+| **Agent reasoning logged** | Full audit trail of decisions |
+
+### Test Infrastructure (Preserved)
+
+| Decision | Rationale |
+|----------|-----------|
 | 10 Docker SQL Server centers | Realistic simulation with progression |
+| Extreme → Normal ordering | Stress-first approach |
+| Zone-based testing | A=synthetic, B=chaos, C=variations, D=clean |
 | Ground truth manifests | Enable automated validation |
-| Threshold edge cases in Center 8 | Regression testing for detection limits |
-| **Extreme → Normal ordering** | Stress-first approach: prove robustness before accuracy |
-| **Possibilities vs Realities** | Synthetic extremes test limits, observed patterns test accuracy |
-| **Zone A fixed at 2** | Synthetic tests are deterministic, one covers all thresholds |
-| **Zone C scales with variance** | Learning zone - add centers here first for more value bank coverage |
-| **Standard = 10 centers (2-2-3-3)** | Balanced coverage for testing and demos |
+
+### Archived Decisions (Pipeline Design)
+
+The following decisions were part of the pipeline design and are now superseded:
+
+| Archived Decision | Replacement |
+|-------------------|-------------|
+| 5-stage pipeline | Agent decides flow |
+| Column Quality at Phase 1b | Agent flags problematic columns |
+| Blueprint + Directory | 3 simple MCP servers |
+| Complex orchestrator | Agent handles orchestration |
+| Hardcoded thresholds | Agent reasoning + trust profiles |
+
+See `archive/pipeline-design/` for original design documentation.
 
 ---
 
 ## Open Questions
 
-1. **Background job framework:** Celery? RQ? Built-in threading?
-2. **LLM integration:** Direct API? Langchain? Custom gateway?
-3. **Database:** Same DB as app? Separate schema? Separate DB?
-4. **Caching:** Redis for classification cache? In-memory?
-5. **Notifications:** Email service? Slack webhook? Both?
+1. ~~**Background job framework:**~~ *Eliminated - Agent handles async*
+2. ~~**LLM integration:**~~ *Resolved - MCP tool calling*
+3. **Database:** Same DB as app? Separate schema? (Still relevant)
+4. **Caching:** Redis for value bank? In-memory? (Still relevant)
+5. ~~**Notifications:**~~ *Simplified - Part of Review Server*
 
 ---
 
-*Last updated: 2024-01-14*
+*Last updated: 2024-01-15*
