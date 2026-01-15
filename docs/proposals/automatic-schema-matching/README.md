@@ -47,34 +47,34 @@ Given requirements in business language, find the actual database columns:
 
 ## Quick Start
 
-### Core Documentation
+### Core Documentation (`core/`)
 
 | Document | Purpose |
 |----------|---------|
-| [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) | **Start here** - Ordered tasks from scratch to production |
-| [TECHNICAL_SOLUTION.md](TECHNICAL_SOLUTION.md) | Architecture and code patterns |
-| [MCP_ARCHITECTURE.md](MCP_ARCHITECTURE.md) | Agent-based architecture with MCP servers |
-| [CANONICAL_ENTITIES.md](CANONICAL_ENTITIES.md) | Target schema definition and known variants |
-| [ACCEPTANCE_CRITERIA.md](ACCEPTANCE_CRITERIA.md) | Gherkin acceptance criteria |
-| [DATABASE_SIMULATOR.md](DATABASE_SIMULATOR.md) | Test databases (10 simulated centers) |
+| [IMPLEMENTATION_ROADMAP.md](core/IMPLEMENTATION_ROADMAP.md) | **Start here** - Ordered tasks from scratch to production |
+| [TECHNICAL_SOLUTION.md](core/TECHNICAL_SOLUTION.md) | Architecture and code patterns |
+| [MCP_ARCHITECTURE.md](core/MCP_ARCHITECTURE.md) | Agent-based architecture with MCP servers |
+| [CANONICAL_ENTITIES.md](core/CANONICAL_ENTITIES.md) | Target schema definition and known variants |
+| [ACCEPTANCE_CRITERIA.md](core/ACCEPTANCE_CRITERIA.md) | Gherkin acceptance criteria |
+| [DATABASE_SIMULATOR.md](core/DATABASE_SIMULATOR.md) | Test databases (10 simulated centers) |
 
-### Interview Preparation
-
-| Document | Purpose |
-|----------|---------|
-| [INTERVIEW_QUESTIONS.md](INTERVIEW_QUESTIONS.md) | Questions to ask, positioning strategies |
-| [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md) | How we compare to Informatica, AWS Glue, Tamr |
-| [COST_BENEFIT.md](COST_BENEFIT.md) | ROI analysis, break-even, 3-year projections |
-| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | 15-20 minute walkthrough for stakeholders |
-| [CODING_EXERCISES.md](CODING_EXERCISES.md) | Senior-level technical discussion prep |
-| [GLOSSARY.md](GLOSSARY.md) | Terminology quick reference |
-
-### Reference
+### Interview Preparation (`interview/`)
 
 | Document | Purpose |
 |----------|---------|
-| [IMPROVEMENTS.md](IMPROVEMENTS.md) | Future enhancements |
-| [DISCUSSION_LOG.md](DISCUSSION_LOG.md) | Design decision history |
+| [INTERVIEW_QUESTIONS.md](interview/INTERVIEW_QUESTIONS.md) | Questions to ask, positioning strategies |
+| [COMPETITIVE_ANALYSIS.md](interview/COMPETITIVE_ANALYSIS.md) | How we compare to Informatica, AWS Glue, Tamr |
+| [COST_BENEFIT.md](interview/COST_BENEFIT.md) | ROI analysis, break-even, 3-year projections |
+| [DEMO_SCRIPT.md](interview/DEMO_SCRIPT.md) | 15-20 minute walkthrough for stakeholders |
+| [CODING_EXERCISES.md](interview/CODING_EXERCISES.md) | Senior-level technical discussion prep |
+| [GLOSSARY.md](interview/GLOSSARY.md) | Terminology quick reference |
+
+### Reference (`reference/`)
+
+| Document | Purpose |
+|----------|---------|
+| [IMPROVEMENTS.md](reference/IMPROVEMENTS.md) | Future enhancements |
+| [DISCUSSION_LOG.md](reference/DISCUSSION_LOG.md) | Design decision history |
 
 ---
 
@@ -129,7 +129,7 @@ The agent:
 | **C** | 5-7 | Moderate variations (test learning) | 75-85% |
 | **D** | 8-10 | Clean baselines (verify accuracy) | 90-98% |
 
-See [DATABASE_SIMULATOR.md](DATABASE_SIMULATOR.md) for details.
+See [DATABASE_SIMULATOR.md](core/DATABASE_SIMULATOR.md) for details.
 
 ---
 
@@ -157,40 +157,30 @@ The original pipeline design is archived at [archive/pipeline-design/](archive/p
 
 ```
 automatic-schema-matching/
-├── README.md                    # This file
+├── README.md                    # This file (index)
 │
-├── # Core Documentation
-├── IMPLEMENTATION_ROADMAP.md    # Ordered tasks: scratch → production
-├── TECHNICAL_SOLUTION.md        # Architecture and code patterns
-├── MCP_ARCHITECTURE.md          # Agent-based architecture
-├── CANONICAL_ENTITIES.md        # Target schema and known variants
-├── ACCEPTANCE_CRITERIA.md       # Test scenarios
-├── DATABASE_SIMULATOR.md        # Test database design
+├── core/                        # Core technical documentation
+│   ├── IMPLEMENTATION_ROADMAP.md    # Ordered tasks: scratch → production
+│   ├── TECHNICAL_SOLUTION.md        # Architecture and code patterns
+│   ├── MCP_ARCHITECTURE.md          # Agent-based architecture
+│   ├── CANONICAL_ENTITIES.md        # Target schema and known variants
+│   ├── ACCEPTANCE_CRITERIA.md       # Test scenarios
+│   └── DATABASE_SIMULATOR.md        # Test database design
 │
-├── # Interview Preparation
-├── INTERVIEW_QUESTIONS.md       # Questions to ask, positioning
-├── COMPETITIVE_ANALYSIS.md      # Market comparison
-├── COST_BENEFIT.md              # ROI and business case
-├── DEMO_SCRIPT.md               # Stakeholder presentation
-├── CODING_EXERCISES.md          # Senior-level technical prep
-├── GLOSSARY.md                  # Terminology reference
+├── interview/                   # Interview preparation materials
+│   ├── INTERVIEW_QUESTIONS.md       # Questions to ask, positioning
+│   ├── COMPETITIVE_ANALYSIS.md      # Market comparison
+│   ├── COST_BENEFIT.md              # ROI and business case
+│   ├── DEMO_SCRIPT.md               # Stakeholder presentation
+│   ├── CODING_EXERCISES.md          # Senior-level technical prep
+│   └── GLOSSARY.md                  # Terminology reference
 │
-├── # Reference
-├── IMPROVEMENTS.md              # Future enhancements
-├── DISCUSSION_LOG.md            # Decision history
+├── reference/                   # Additional reference materials
+│   ├── IMPROVEMENTS.md              # Future enhancements
+│   └── DISCUSSION_LOG.md            # Decision history
 │
 └── archive/
     └── pipeline-design/         # Original pipeline approach (superseded)
-        ├── README.md
-        ├── 01-basic-methodology.md
-        ├── 02-advanced-methodology.md
-        ├── 03-value-banks.md
-        ├── 04-validation.md
-        ├── 05-implementation.md
-        ├── 06-ml-enhancement.md
-        ├── 07-reference.md
-        ├── ARCHITECTURE.md
-        └── ACCEPTANCE.md
 ```
 
 ---
