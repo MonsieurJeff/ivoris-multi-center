@@ -11,7 +11,9 @@
       "Bash(npm run:*)",
       "Bash(npm audit:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\ndocs: Add comprehensive Clinero negotiation preparation\n\nInterview prep and compensation strategy:\n- INTERVIEW_PREP_2026-01-17.md: Initial call preparation\n- compensation/ROADMAP_INTERNAL.md: Master timeline with codebase analysis\n- compensation/COMPENSATION_MODELS_INTERNAL.md: 4 salary/equity models\n- compensation/QUESTIONS_FOR_MAX.md: 18 questions to ask Max\n- compensation/OUTREPILOT_DEMO_STRATEGY.md: Demo execution plan\n- compensation/DECISION_TRIANGLE_INTERNAL.md: Full negotiation framework\n- compensation/DECISION_DIAMOND_PERSONAL.md: Personalized positions\n- compensation/CONVERGENCE_WORKFLOW.md: Iterative refinement process\n\nKey findings:\n- OutrePilot/Outrepreneur 92% production ready\n- Target: €70k + 15% + CTO + OutrePilot bonus\n- Only hard walk-aways: IP transfer, no CTO path, dishonesty\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\ndocs: Add comprehensive Clinero negotiation preparation\n\nInterview prep and compensation strategy:\n- INTERVIEW_PREP_2026-01-17.md: Initial call preparation\n- compensation/ROADMAP_INTERNAL.md: Master timeline with codebase analysis\n- compensation/COMPENSATION_MODELS_INTERNAL.md: 4 salary/equity models\n- compensation/QUESTIONS_FOR_MAX.md: 18 questions to ask Max\n- compensation/OUTREPILOT_DEMO_STRATEGY.md: Demo execution plan\n- compensation/DECISION_TRIANGLE_INTERNAL.md: Full negotiation framework\n- compensation/DECISION_DIAMOND_PERSONAL.md: Personalized positions\n- compensation/CONVERGENCE_WORKFLOW.md: Iterative refinement process\n\nKey findings:\n- OutrePilot/Outrepreneur 92% production ready\n- Target: €70k + 15% + CTO + OutrePilot bonus\n- Only hard walk-aways: IP transfer, no CTO path, dishonesty\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)"
     ]
   }
 }
